@@ -1,0 +1,334 @@
+#' @title wave length
+#' @description This functions provide the number of peaks, oscilations.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return plots
+#' @export OI
+
+wave.length <- function(interval = NULL, data){
+
+  if(is.null(interval)){ #En caso de ser NULL el intervalo, por defecto se toma el intervalo [0, 1] para estimar el índice de oscilaciones
+    interval <- c(0, 1)
+  }
+  data <- data[data[, 1] <= interval[2] &  data[, 1] >= interval[1], ]
+  sigma <- apply(data[, -1], MARGIN = 2, function(X){summary(lm(X ~ data[, 1]))$sigma})
+  resid <- apply(data[, -1], MARGIN = 2, function(X){residuals(lm(X ~ data[, 1]))})
+  resid.est <- apply(data[, -1], MARGIN = 2, function(X){rstudent(lm(X ~ data[, 1]))})
+  DW <- apply(data[, -1], MARGIN = 2, function(X){lmtest::dwtest(data[, 1] ~ X)$p.value})
+  autoc <- DW <= 0.05
+
+  resid.lag <- rbind(c(rep(NA, ncol(resid))), resid[- nrow(resid), ])
+  resid.sign <- sign(resid.lag) + sign(resid)
+  resid.sign2 <- apply(resid.sign[-1, ], 2, function(x){
+    results <- NULL
+    for(i in 1:(length(x))){results <- c(results, ifelse(x[i] == 0 & x[(i + 1)] == 0,x[(i - 1)] , x[(i)]))}
+    return(results)
+  })
+  resid.sign2[nrow(resid.sign2), ] <- resid.sign[nrow(resid.sign), ]
+  wave.length <- apply(resid.sign2, 2, function(x){sum(x != 0)/sum(x == 0)})*(data[2, 1] - data[1, 1])
+  amplitud <-  apply(resid, 2, function(x){abs(max(x) - min(x))})
+  return(data.frame(WL = wave.length, Amplitud = amplitud))
+}
+
+
+
+#' @title Oscilations number.
+#' @description This functions provide the number of peaks, oscilations.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return plots
+#' @export OI
+
+OI <- function(interval = NULL, data, noise = NULL){
+  #Noise
+  if(is.null(noise)){ #En caso de ser NULL el intervalo para el ruido, por defecto se toma el intervalo [0, 0.5]
+    noise <- c(0, 0.5)
+  }
+  Q1 <- apply(data[data[, 1] <= noise[2] &  data[, 1] >= noise[1], -1], MARGIN = 2, function(X){quantile(X, 0.25)})
+  Q3 <- apply(data[, -1], MARGIN = 2, function(X){quantile(X, 0.75)})
+  desv.noise <- apply(data[data[, 1] <= 0.5, ], MARGIN = 2, sd)
+
+  if(is.null(interval)){ #En caso de ser NULL el intervalo, por defecto se toma el intervalo [0, 1] para estimar el índice de oscilaciones
+    interval <- c(0, 1)
+  }
+  data <- data[data[, 1] <= interval[2] &  data[, 1] >= interval[1], ]
+  Q2 <- apply(data[, -1], MARGIN = 2, function(X){quantile(X, 0.5)})
+  LS <- Q2 + desv.noise
+  LI <- Q2 - desv.noise
+  number.up <- apply(rbind(data[, -1], LS), MARGIN = 2, function(X){X[-length(X)] >= X[length(X)]})
+  number.up.lash <- rbind(number.up[-1, ], rep(FALSE, ncol(number.up[-1, ]))) #delay
+  number.down <- apply(rbind(data[, -1], LI), MARGIN = 2, function(X){X[-length(X)] <= X[length(X)]})
+  number.down.lash <- rbind(number.down[-1, ], rep(FALSE, ncol(number.down[-1, ]))) #delay
+  sum.number.down <- number.down != number.down.lash
+  sum.number.up <- number.up != number.up.lash
+  peaks <- apply(rbind(sum.number.up, sum.number.down), MARGIN = 2, function(X){(max(sum(X[1:(length(X)/2)]), sum(X[(1 + length(X)/2):(length(X))])))})
+}
+
+
+
+
+#' @title Multivariate outliers.
+#' @description An oultier detection is carried out by applying Mahalanobis distances, where means vetor and correlation matrix is computed with those data whose mahalanobis distance is lower than median of mahalanobis distances.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return plots
+#' @export mahOutlier
+
+mahOutlier <- function(X){
+  #rango
+  QR.desc <- qr(X)
+  rangoX <- QR.desc$rank
+  # Media de todos los datos, el centro
+  centro <- colMeans(X)
+  # Distancia de Mahalanobis al centro
+  #if(rangoX < ncol(X)){
+    dm <- mahalanobis(X, centro, MASS::ginv(cov(X)), inverted = TRUE)
+  #}else{
+    #dm <- mahalanobis(X, centro, cov(X))
+  #}
+  # Selección del 50% de los datos con menor dm
+  X.menordm <- X[dm <= quantile(dm)[4],]
+  # Estimadores reducidos
+  centroR <- colMeans(X.menordm)
+  covarianzaR <- cov(X.menordm)
+  # distancias de mahalanobis al centro reducido
+  p <- ncol(X)
+  #if(rangoX < ncol(X)){
+    dmR <- mahalanobis(X, centroR, MASS::ginv(covarianzaR), inverted = TRUE)
+  #}else{
+   # dmR <- mahalanobis(X, centroR, covarianzaR)
+  #}
+
+  outliers <- as.numeric(which(dmR > p + 3 * sqrt(2 * p)))
+  return(outliers)
+}
+
+
+
+
+#' @title Calcium Image data analysis.
+#' @description thisfunction allows arring out a comprensive calcium
+#'   image data analysis.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return plots
+#' @export analCI
+
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE){
+  #directories
+  if(is.null(directory)){
+    directory <- getwd()
+  }
+  archivos <- dir(directory)
+  if(length(grep(pattern = "resultados", archivos)) == 0){
+    dir.create(file.path(directory, "resultados"))
+  }
+  results.dir <- file.path(directory, "resultados")
+  archivos <- archivos[archivos != c("recopilarDatos.Rmd")]
+  archivos <- archivos[archivos != "resultados"]
+  grupo.numero <- 0
+  #read .txt
+  for(z in archivos){
+    tequiste <- dir(file.path(directory, z))
+    tequiste <-tequiste[grep(".txt", tequiste)]
+    datos <- read.table(file.path(file.path(directory, z), tequiste), header = FALSE, skip = skip)
+    colnames(datos) <- c("Time", paste("ROI", 1:(dim(datos)[2]-1)))
+    datos$Time <- datos$Time/60000
+    #remove those ROIs whose response is bad
+    if(length(grep("remove", dir(file.path(directory, z)))) != 0){
+      remove.exp <- read.csv2(file.path(file.path(directory, z), "remove.csv"), header = TRUE)
+      datos <- datos[, -(as.numeric(remove.exp$remove)+1)]
+    }
+    #pdf raw data
+    pdf(paste(results.dir,"/Graficos", z, ".pdf", sep = ""))
+    plot(datos$Time, datos[,2], type = "l", col = 2, xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), main = z, axes = FALSE)
+    axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 0), by = 0.1))
+    for(i in 3:dim(datos)[2]){
+      lines(datos$Time, datos[,i], type = "l", col = i, lwd = 2)
+    }
+    if(legend.ROIs == TRUE){
+      legend("topleft", legend = colnames(datos)[-1], col = 2:dim(datos)[2], cex = 0.5, lty = 1, ncol = 2)
+    }
+    #Estímulos
+    estimulos <- read.csv2(file.path(file.path(directory, z), "estimulos.csv"), header = TRUE)
+
+    #Cortar el registro hasta donde interese, denominado como cut en estimulos
+    if(length(grep("cut", estimulos[,1])) != 0){
+      cut <- estimulos[grep("cut", estimulos[, 1]), ]
+      estimulos <- estimulos[- grep("cut", estimulos[,1]), ]
+      datos <- datos[datos[, 1] <= as.numeric(cut[2]), ]
+    }
+    color <- estimulos[,1]
+    for(i in 1:dim(estimulos)[1]){
+      lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
+      text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
+    }
+    lines(c(max(datos[,1])-1.5, max(datos[,1])-0.5), c(max(datos[,-1])+0.15*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.15), lty = 1, col = "black", lwd = 10)
+    text(mean(c(max(datos[,1])-1.5, max(datos[,1])-0.5)),c(max(datos[,-1])+0.20*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.20), labels = "1min")
+    dev.off()
+
+    #ejes estimulos
+    require(pracma)
+    y.estimulosS <- data.frame(matrix(0,nrow=dim(estimulos)[1], ncol=dim(datos)[2]-1)) #matriz de longitud estiulosXROIS
+    y.estimulosE <- data.frame(matrix(0,nrow=dim(estimulos)[1], ncol=dim(datos)[2]-1)) #matriz de longitud estiulosXROIS
+    if(estimulos[dim(estimulos)[1], dim(estimulos)[2]] > datos$Time[length(datos$Time)]){
+      estimulos[dim(estimulos)[1], dim(estimulos)[2]] <- datos$Time[length(datos$Time)]
+    } #En caso de que el estimulo final termine mas tarde del tiempo de los datos, se fija que termina cuando acaba el tiempo de los datos
+    if(estimulos[1, 2] == 0){
+      estimulos[1, 2] <- datos$Time[2]
+    } #En caso de que el estimulo inicial empiece a tiempo cero, se corrige para que sea el instante posterior y no de posteriormente errores
+    for(i in 1:dim(estimulos)[1]){
+      posicionS <- datos[datos$Time < estimulos[i,2],] #TRUE todos los valores cuyo tiempo sea interior al del estimulo
+      y.estimulosS[i,] <- as.numeric(posicionS[dim(posicionS)[1],-1]) #Se fija el valor de respuesta correspondiente al ultimo TRUE de posicionS, y sera el valor de respuesta cuando comienza el estimulo (basal por estimulo)
+      rownames(y.estimulosS)[i] <- as.character(posicionS[dim(posicionS)[1],1]) #Se guarda a que tiempo comienza el estimulo segun los datos temporales registrados
+      y.estimulosE[i,] <- as.numeric(datos[datos$Time > estimulos[i,3],-1][1,]) #Aqui el primer true corresponde con el fin del estimulo
+      if(sum(is.na(y.estimulosE[i,])) != 0){
+        y.estimulosE[i,] <- as.numeric(datos[datos$Time >= estimulos[i,3],-1][1,])
+        rownames(y.estimulosE)[i] <- as.character(datos[datos$Time >= estimulos[i,3],1][1]) #En caso de que no haya tiempos mayores se coge el igual o mayor en vez de mayor
+      }else {
+        rownames(y.estimulosE)[i] <- as.character(datos[datos$Time > estimulos[i,3],1][1])
+      }
+    }
+    #Alturas
+    alturas <- data.frame(matrix(0,ncol=(dim(estimulos)[1]+2), nrow = dim(datos)[2]-1)) #Matriz de dimension ROIS X Estimulos+1
+    y.estimulos <- rbind(y.estimulosS, y.estimulosE) #Se une la matriz de registro para principio del estimulo con la del final del estimulo para cada ROI
+    tiempos <- as.numeric(rownames(y.estimulos)) #Los tiempos de principio y fin de estimulo segun tiempo regustrado
+    alturas[,(dim(alturas)[2]-1)] <- as.numeric(datos[1,-1]) #datos basales inicio
+    alturas[,dim(alturas)[2]] <- as.numeric(datos[nrow(datos),-1]) #datos basales final
+    colnames(alturas)[(dim(alturas)[2]-1)] <- "BASAL.Principio"
+    colnames(alturas)[dim(alturas)[2]] <- "BASAL.Final"
+    for(i in 1:dim(estimulos)[1]){
+      #Selecciona el intervalo del estimulo y busca el max
+      altura.total <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, max)
+      #Selecciona el intervalo del estimulo y busca el min
+      altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
+      #Aquí tiene en cuenta si el estímulo hace bajar o subir la señal
+      alturas[,i] <- apply(rbind(altura.total, altura.total.min, as.numeric(y.estimulosS[i,])), 2, FUN = function(x){ifelse(abs(x[1] - x[3]) >= abs(x[2] - x[3]), x[1] - x[3], x[2] - x[3])}) #corrige por el valor de respuesta (min) previo al estimulo
+      colnames(alturas)[i] <- paste("ALTURA", i, sep="")
+    }
+    rownames(alturas) <- colnames(datos)[-1] #Nombra segun los ROIs
+    #variables alturas
+    datos.basal <- datos
+    #variables área
+    areas <- data.frame(matrix(0,ncol=dim(estimulos)[1], nrow = dim(datos)[2]-1))
+    for(i in 1:dim(estimulos)[1]){
+      area.total <- apply(datos.basal[sum(datos.basal$Time < estimulos[i,2]):(sum(datos.basal$Time < estimulos[i,3])+1),-1], 2, function(x){trapz(x = datos.basal[sum(datos.basal$Time < estimulos[i,2]):(sum(datos.basal$Time < estimulos[i,3])+1),1], y = x)})
+      area.restar <- apply(y.estimulos[c(i,(i+dim(estimulos)[1])),], 2, function(x){trapz(x = tiempos[c(i,(i+dim(estimulos)[1]))], y = x)})
+      areas[,i] <- area.total- area.restar
+      colnames(areas)[i] <- paste("AREA", i, sep="")
+    }
+    rownames(areas) <- colnames(datos)[-1]
+    #Oscilations Index
+    longitud.onda <- wave.length(interval = NULL, data = datos)
+
+
+    #table
+    write.csv2(cbind(areas, alturas, longitud.onda), paste(results.dir,"/datos", z, ".csv", sep = ""))
+
+    #Outliers Se tiene en cuenta que el numero de observaciones no sea menor que el numero de variables. En ese caso, no se obtienen los outliers
+    datosO <- datos #En el gráfico del final sin outliers se usará datosO en lugar de datos, por si a caso se han eliminado outliers cumpliendose que p >= n
+    if(outlier == TRUE && nrow(areas) > ncol(cbind(areas, alturas))){
+      X = cbind(areas, alturas)
+      outliers <- mahOutlier(X)
+      if(length(outliers) != 0){ #Si no hay outliers no se quitan
+        areas <- areas[-outliers, ]
+        alturas <- alturas[-outliers, ]
+        longitud.onda <- longitud.onda[-outliers, ]
+        datosO <- datos[,-(outliers+1)]
+      }
+    }
+
+    #distancias
+    distancias <- dist(scale(cbind(areas, alturas)), method = "euclidean")
+    grupo.numero <- grupo.numero + 1
+    if(is.null(grupos)){
+      grupos = rep(3, length(archivos))
+    }
+    if(agrupacion == "silueta"){
+      grupos = rep(0, length(archivos))
+      tope <- ifelse(ncol(datosO[,-1]) >= 6, 5, ncol(datosO)-2)
+      siluetas <- as.numeric(vector(length = tope-1))
+      for (i in 2:tope) {
+        silueta.media <- cluster::silhouette(cluster::pam(scale(cbind(areas, alturas)), k = i), grupos[grupo.numero], dist = distancias)
+        siluetas[(i-1)] <- mean(silueta.media[,3])
+      }
+      grupos[grupo.numero] <- which(siluetas == max(siluetas))+1
+    }
+    pdf(paste(results.dir,"/Cluster", z, ".pdf", sep = ""))
+    plot(hclust(distancias, method = "ward.D2"), main = z)
+    dev.off()
+    kmedioides <- cluster::pam(scale(cbind(areas, alturas)), grupos[grupo.numero])
+    grupos2 <- cutree(hclust(distancias), grupos[grupo.numero])
+    write.csv2(cbind(areas, alturas, longitud.onda, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2), paste(results.dir,"/datos", z, ".csv", sep = ""))
+    if(modo == "Kmedioids"){
+      grupitos = as.numeric(table(kmedioides$clustering))
+      asignacion <- kmedioides$clustering
+    }
+    if(modo == "cluster"){
+      grupitos = as.numeric(table(grupos2))
+      asignacion <- grupos2
+    }
+    require(ggplot2)
+    require(ggfortify)
+    require(cluster)
+    PCA <- prcomp(cbind(areas, alturas), scale. = data.scale)
+    pdf(paste(results.dir,"/PCA", z, ".pdf", sep = ""))
+    #autoplot(PCA, shape = FALSE, label.size = 3)
+    plot(PCA$x[,1], PCA$x[,2], xlab = paste("PC1", round(PCA$sdev[1]^2/sum(PCA$sdev^2)*100,2),"%"), ylab = paste("PC2", round(PCA$sdev[2]^2/sum(PCA$sdev^2)*100,2),"%"), main = z, col = 0)
+    text(PCA$x[,1], PCA$x[,2], labels = colnames(datos)[-1], col = as.numeric(asignacion))
+    dev.off()
+    tabla.medias <- apply(cbind(areas, alturas), MARGIN = 2, FUN = tapply, INDEX=asignacion, mean)
+    tabla.desviaciones <- apply(cbind(areas, alturas), MARGIN = 2, FUN = tapply, INDEX=asignacion, sd)/sqrt(grupitos)
+    pdf(paste(results.dir,"/Barras.Altura", z, ".pdf", sep = ""))
+    media.altura <- tabla.medias[,grep("ALTURA", colnames(tabla.medias))]
+    media.altura[is.na(media.altura)] <- 0
+    desviacion.altura <- tabla.desviaciones[,grep("ALTURA", colnames(tabla.desviaciones))]
+    desviacion.altura[is.na(desviacion.altura)] <- 0
+
+    #diagramas de barras
+    barras <- barplot(media.altura, beside = TRUE, las = 2, cex.names = 0.5, ylim = c(0, max(media.altura + desviacion.altura)*1.2), col = 2:(length(grupitos)+1), main = z, names.arg = estimulos[,1])
+    arrows(barras, media.altura + desviacion.altura, barras, media.altura - desviacion.altura, angle = 90, code = 3)
+    legend("topright", legend = paste("n = ", grupitos), fill = 2:(length(grupitos)+1))
+    dev.off()
+
+
+    #tablas medias desviaciones
+    descriptiva <- matrix(0, ncol = (2*length(grupitos)+2), nrow = (length(estimulos[,1])+1))
+    rownames(descriptiva) <- c(as.character(estimulos[,1]), "n")
+    colnames(descriptiva) <- c(paste(rep(c("media", "desviación"), length(grupitos)), rep(1:length(grupitos), each = 2)), "Media Global", "Desviación Global")
+    for(i in 1:length(grupitos)){
+      descriptiva[,(2*(i-1)+1)] <- c(signif(t(media.altura)[,i],2),grupitos[i])
+      descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ")
+    }
+    if(length(estimulos[,1]) > 1){
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "")
+    }else{
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "")
+    }
+
+    write.csv2(descriptiva, paste(results.dir,"/descriptiva", z, ".csv", sep = ""))
+
+    #pdf raw data agrupados y sin outliers
+    pdf(paste(results.dir,"/Graficos_Grupos", z, ".pdf", sep = ""))
+    color <- as.numeric(asignacion)
+    plot(datos$Time, datosO[,2], type = "l", col = color[1], xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(-0.1,max(datosO[,-1])+max(datosO[,-1])*0.25), main = z, axes = FALSE)
+    axis(side = 2, at = seq(0, round(max(datosO[,-1])+max(datosO[,-1])*0.25, 1), by = 0.1))
+    for(i in 3:dim(datosO)[2]){
+      lines(datosO$Time, datosO[,i], type = "l", col = color[(i-1)], lwd = 2)
+    }
+    if(legend.ROIs == TRUE){
+      legend("topleft", legend = colnames(datosO)[-1], col = color, cex = 0.5, lty = 1, ncol = 2)
+    }
+    color <- estimulos[,1]
+    for(i in 1:dim(estimulos)[1]){
+      lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
+      text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
+    }
+    lines(c(max(datosO[,1])-1.5, max(datosO[,1])-0.5), c(max(datosO[,-1])+0.15*max(datosO[,-1]), max(datosO[,-1])+max(datosO[,-1])*0.15), lty = 1, col = "black", lwd = 10)
+    text(mean(c(max(datosO[,1])-1.5, max(datosO[,1])-0.5)),c(max(datosO[,-1])+0.20*max(datosO[,-1]), max(datosO[,-1])+max(datosO[,-1])*0.20), labels = "1min")
+    dev.off()
+
+  }
+}

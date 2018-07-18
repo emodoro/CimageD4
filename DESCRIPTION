@@ -1,0 +1,27 @@
+Package: CimageD4
+Type: Package
+Title: Analysis of Calcium Image Assays data sets
+Description:  Calcium Image assay requires the tedious and time-consuming of 
+    analyze cell per cell responses. That is why CimageD4 package allows carring
+    out a comprensive calcium image analysis workflow. 
+Version: 1.2.3
+Autors@R: person("Enrique", "Perez-Riesgo", email = "epercamh@gmail.com", 
+    role = c("aut", "cre"))
+Imports:
+    pracma (>= 2.1.4),
+    MVN (>= 5.3),
+    cluster (>= 2.0.7-1),
+    ggfortify,
+    ggplot2
+Depends:
+    R (>= 3.4.2)
+Suggests:
+    knitr,
+    rmarkdown
+License: GPL (>= 2)
+Encoding: UTF-8
+LazyData: true
+URL: http://github.com/emodoro/CimageD4
+BugReports: http://github.com/emodoro/CimageD4/issues
+RoxygenNote: 6.0.1
+VignetteBuilder: knitr
