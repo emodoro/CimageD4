@@ -50,12 +50,13 @@ OI <- function(interval = NULL, data){
   diferencia2 <- diferencia ^ 2
   d2 <- diferencia2[, -1] + diferencia2[, 1]
   distancia <- sqrt(d2)
-  IO <- colSums(distancia)
+  IO <- colSums(distancia)/(data[nrow(data), 1]- data[1, 1])
   return(IO)
   #prueba <- NULL
   #for(i in 2:nrow(as.matrix(dist(data[, c(1, 3)])))){prueba <- c(prueba, as.matrix(dist(data[, c(1, 3)]))[i, (i-1)])}
   #sum(prueba)
 }
+
 
 
 
@@ -99,16 +100,24 @@ mahOutlier <- function(X){
 
 
 #' @title Calcium Image data analysis.
-#' @description thisfunction allows arring out a comprensive calcium
-#'   image data analysis.
+#' @description this function allows arring out a comprensive calcium image data
+#'   analysis. Notably, the folder which stores the .txt also has to store a
+#'   .csv file where each row correspond to a stimuli, shuch that the first
+#'   colomn store the name of each stimuli, the second column the stimuli start
+#'   time, in seconds, and the third column the stimuli-end-time. Aditional rows
+#'   can be typing: cut: This row meaning the interval of experiment which you
+#'   want to remove. Nisoldipina: The interval of experiment where Nisoldipina,
+#'   an antagonist of VOCCs, is emplyed in order to remove the masking efect of
+#'   Calcium entry through VOCCs when you are concern with asses SOCE
 #' @author Enrique Perez_Riesgo
-#' @param grupos
+#' @param grupos Allows stablishing a number of groups deshired
+#' @param
 #' @return plots
 #' @export analCI
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL){
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE){
   #directories
   if(is.null(directory)){
     directory <- getwd()
@@ -127,13 +136,17 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     tequiste <-tequiste[grep(".txt", tequiste)]
     datos <- read.table(file.path(file.path(directory, z), tequiste), header = FALSE, skip = skip)
     colnames(datos) <- c("Time", paste("ROI", 1:(dim(datos)[2]-1)))
-    datos$Time <- datos$Time/60000
+    #Unidades
+    Unidades <- c("ms", "s")
+    unidades <- c(6*10^4, 6*10)
+    datos$Time <- datos$Time/ unidades[grep(paste("^", Units, sep = ""), Unidades)]
     #remove those ROIs whose response is bad
     if(length(grep("remove", dir(file.path(directory, z)))) != 0){
       remove.exp <- read.csv2(file.path(file.path(directory, z), "remove.csv"), header = TRUE)
       datos <- datos[, -(as.numeric(remove.exp$remove)+1)]
     }
-    #pdf raw data
+
+    #pdf datos sin suavizar
     pdf(paste(results.dir,"/Graficos", z, ".pdf", sep = ""))
     plot(datos$Time, datos[,2], type = "l", col = 2, xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), main = z, axes = FALSE)
     axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 0), by = 0.1))
@@ -151,6 +164,17 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       cut <- estimulos[grep("cut", estimulos[, 1]), ]
       estimulos <- estimulos[- grep("cut", estimulos[,1]), ]
       datos <- datos[datos[, 1] <= as.numeric(cut[2]), ]
+
+    }
+    if(length(grep("IO", estimulos[,1])) != 0 & is.null(interval)){
+      interval <- as.numeric(estimulos[grep("IO", estimulos[, 1]), -1])
+      estimulos <- estimulos[- grep("IO", estimulos[,1]), ]
+    }
+    Nisoldipina <- NULL
+    if(length(grep("Nisoldipin", estimulos[,1])) != 0){
+      Nisoldipina <- as.numeric(estimulos[grep("Nisoldipina", estimulos[, 1]), -1])
+      Nisoldipina <- c(datos[sum(datos$Time <= Nisoldipina[1]), 1], datos[sum(datos$Time < Nisoldipina[2]) + 1, 1])
+      estimulos <- estimulos[- grep("Nisoldipina", estimulos[,1]), ]
     }
     color <- estimulos[,1]
     for(i in 1:dim(estimulos)[1]){
@@ -160,6 +184,12 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     lines(c(max(datos[,1])-1.5, max(datos[,1])-0.5), c(max(datos[,-1])+0.15*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.15), lty = 1, col = "black", lwd = 10)
     text(mean(c(max(datos[,1])-1.5, max(datos[,1])-0.5)),c(max(datos[,-1])+0.20*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.20), labels = "1min")
     dev.off()
+
+    #Datos Suavizados (datos) y sin suavizar (datosraw)
+    datosraw <- datos
+    if(Smooth. == TRUE){
+      datos <- data.frame(apply(datos, 2, function(x){smooth(x)}))
+    }
 
     #ejes estimulos
     require(pracma)
@@ -194,6 +224,13 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     for(i in 1:dim(estimulos)[1]){
       #Selecciona el intervalo del estimulo y busca el max
       altura.total <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, max)
+      if(!is.null(Nisoldipina)){ #Primero se evalua si Nisoldipina es NULL, y en caso negativo, si el estimulo i esta dentro del intervalo de accion de la nisoldipina
+        print(Nisoldipina)
+        if(Nisoldipina[1] <= datos[sum(datos$Time < estimulos[i,2]), 1]  & Nisoldipina[2] >= datos[sum(datos$Time < (estimulos[i,3])+1), 1]){
+          altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
+          print(altura.total)
+        }
+      }
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
       #Aquí tiene en cuenta si el estímulo hace bajar o subir la señal
@@ -214,8 +251,8 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     rownames(areas) <- colnames(datos)[-1]
 
     #Oscilations Index
-    oscilation.index <- OI(interval = interval, data = datos)
-    longitud.onda <- wave.length(interval = interval, data = datos)
+    oscilation.index <- OI(interval = interval, data = datosraw)
+    longitud.onda <- wave.length(interval = interval, data = datosraw)
 
 
     #table

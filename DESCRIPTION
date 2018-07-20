@@ -4,7 +4,7 @@ Title: Analysis of Calcium Image Assays data sets
 Description:  Calcium Image assay requires the tedious and time-consuming of 
     analyze cell per cell responses. That is why CimageD4 package allows carring
     out a comprensive calcium image analysis workflow. 
-Version: 1.2.4
+Version: 1.3.2
 Autors@R: person("Enrique", "Perez-Riesgo", email = "epercamh@gmail.com", 
     role = c("aut", "cre"))
 Imports:
