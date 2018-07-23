@@ -106,7 +106,9 @@ mahOutlier <- function(X){
 #'   colomn store the name of each stimuli, the second column the stimuli start
 #'   time, in seconds, and the third column the stimuli-end-time. Aditional rows
 #'   can be typing: cut: This row meaning the interval of experiment which you
-#'   want to remove. Nisoldipina: The interval of experiment where Nisoldipina,
+#'   want to remove.
+#'   IO: Interval where asses oscilation index.
+#'   Nisoldipina: The interval of experiment where Nisoldipina,
 #'   an antagonist of VOCCs, is emplyed in order to remove the masking efect of
 #'   Calcium entry through VOCCs when you are concern with asses SOCE
 #' @author Enrique Perez_Riesgo
@@ -166,7 +168,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       datos <- datos[datos[, 1] <= as.numeric(cut[2]), ]
 
     }
-    if(length(grep("IO", estimulos[,1])) != 0 & is.null(interval)){
+    if(length(grep("IO", estimulos[,1])) != 0){
       interval <- as.numeric(estimulos[grep("IO", estimulos[, 1]), -1])
       estimulos <- estimulos[- grep("IO", estimulos[,1]), ]
     }
@@ -325,6 +327,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     barras <- barplot(media.altura, beside = TRUE, las = 2, cex.names = 1, ylim = c(min(pretty(media.altura - desviacion.altura)), max(media.altura + desviacion.altura)*1.2), col = 2:(length(grupitos)+1), main = z, names.arg = estimulos[,1])
     arrows(barras, media.altura + desviacion.altura, barras, media.altura - desviacion.altura, angle = 90, code = 3)
     legend("topright", legend = paste("n = ", grupitos), fill = 2:(length(grupitos)+1))
+    box(bty = "l")
     dev.off()
 
     #OI
@@ -338,6 +341,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     barras <- barplot(media.OI, beside = TRUE, las = 2, cex.names = 1, ylim = c(min(pretty(media.OI - desviacion.OI)), max(pretty(media.OI + desviacion.OI*1.2))), col = 2:(length(grupitos)+1), main = z, xpd = F)
     arrows(barras, media.OI + desviacion.OI, barras, media.OI - desviacion.OI, angle = 90, code = 3)
     legend("topright", legend = paste("n = ", grupitos), fill = 2:(length(grupitos)+1))
+    box(bty = "l")
     dev.off()
 
 
@@ -345,16 +349,17 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     descriptiva <- matrix(0, ncol = (2*length(grupitos)+2), nrow = (length(estimulos[,1])+2))
     rownames(descriptiva) <- c(as.character(estimulos[,1]), "n", "OI")
     colnames(descriptiva) <- c(paste(rep(c("media", "desviación"), length(grupitos)), rep(1:length(grupitos), each = 2)), "Media Global", "Desviación Global")
+    descriptiva <- data.frame(descriptiva)
     for(i in 1:length(grupitos)){
-      descriptiva[,(2*(i-1)+1)] <- c(signif(t(media.altura)[,i],2),grupitos[i], signif(t(media.OI)[,i],2))
-      descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ", signif(t(desviacion.OI)[,i],2))
+      descriptiva[,(2*(i-1)+1)] <- c(signif(t(media.altura)[,i],2),grupitos[i], t(media.OI)[,i])
+      descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ", t(desviacion.OI)[,i])
     }
     if(length(estimulos[,1]) > 1){
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos), signif(mean(oscilation.index),2))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "", signif(sd(oscilation.index),2))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos), mean(oscilation.index))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "", sd(oscilation.index))
     }else{
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos), signif(mean(oscilation.index),2))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "", signif(sd(oscilation.index),2))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos), mean(oscilation.index))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "", sd(oscilation.index))
     }
 
     write.csv2(descriptiva, paste(results.dir,"/descriptiva", z, ".csv", sep = ""))
