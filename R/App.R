@@ -15,6 +15,7 @@ ui <- shinyUI(fluidPage(
                  fileInput("removefile", h3("Introducir remove.csv"), accept = c(".csv")),
                  radioButtons("Outliers", "Remove Multivariate Outliers?", list("TRUE", "FALSE")),
                  radioButtons("Smooth", "Signal Smooth?", list("TRUE", "FALSE")),
+                 radioButtons("IntervalSel", "Select Interval?", list("TRUE", "FALSE")),
                  sliderInput("interval", "Intervalo para Indice de Oscilaciones", min = 0, max = 20, value = 1)),
     mainPanel(h3("Results"),
                  plotOutput("cabecera"),
@@ -30,7 +31,9 @@ server <- shinyServer(
       datos <- input$txt$datapath
       datos <- read.table(datos, header = FALSE, skip = input$skip)
       colnames(datos) <- c("Time", paste("ROI", 1:(dim(datos)[2]-1)))
-      datos$Time <- datos$Time/60000
+      Unidades <- c("ms", "s")
+      unidades <- c(6*10^4, 6*10)
+      datos$Time <- datos$Time/unidades[grep(paste("^", input$Units, sep = ""), Unidades)]
 
       #remove those ROIs whose response is bad
       remove <- input$removefile$datapath
@@ -52,8 +55,7 @@ server <- shinyServer(
         outliers <- as.numeric(which(dmR > p + 3 * sqrt(2 * p)))
         return(outliers)
       }
-
-
+      
       #Estimulos
       estimulos <- input$estimulos$datapath
       estimulos <- read.csv2(estimulos, header = TRUE)
@@ -70,9 +72,13 @@ server <- shinyServer(
         estimulos <- estimulos[- grep("Nisoldipina", estimulos[,1]), ]
       }
       interval <- c(0, input$interval)
-      if(length(grep("IO", estimulos[,1])) != 0 & is.null(interval)){
+      if(length(grep("IO", estimulos[,1])) != 0 &  input$IntervalSel == FALSE){
         interval <- as.numeric(estimulos[grep("IO", estimulos[, 1]), -1])
         estimulos <- estimulos[- grep("IO", estimulos[,1]), ]
+      }else{
+        if(length(grep("IO", estimulos[,1])) != 0){
+          estimulos <- estimulos[- grep("IO", estimulos[,1]), ]
+        }
       }
 
       #Datos Suavizados (datos) y sin suavizar (datosraw)
@@ -80,7 +86,7 @@ server <- shinyServer(
       if(input$Smooth == TRUE){
         datos <- data.frame(apply(datos, 2, function(x){smooth(x)}))
       }
-
+      output$tabla <- renderTable(input$interval)
       #ejes estimulos
       require(pracma)
       y.estimulosS <- data.frame(matrix(0,nrow=dim(estimulos)[1], ncol=dim(datos)[2]-1)) #matriz de longitud estiulosXROIS
@@ -176,7 +182,10 @@ server <- shinyServer(
       }
       lines(c(max(datos[,1])-1.5, max(datos[,1])-0.5), c(max(datos[,-1])+0.15*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.15), lty = 1, col = "black", lwd = 10)
       text(mean(c(max(datos[,1])-1.5, max(datos[,1])-0.5)),c(max(datos[,-1])+0.20*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.20), labels = "1min")
-
+      if(input$IntervalSel == TRUE){
+        abline(v = interval[2], col = "red")
+      }
+      
       output$tabla <- renderTable({cbind(alturas, oscilation.index)}, rownames = TRUE)
       })
 

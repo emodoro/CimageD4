@@ -13,7 +13,6 @@ wave.length <- function(interval = NULL, data){
   data <- data[data[, 1] <= interval[2] &  data[, 1] >= interval[1], ]
   sigma <- apply(data[, -1], MARGIN = 2, function(X){summary(lm(X ~ data[, 1]))$sigma})
   resid <- apply(data[, -1], MARGIN = 2, function(X){residuals(lm(X ~ data[, 1]))})
-  resid.est <- apply(data[, -1], MARGIN = 2, function(X){rstudent(lm(X ~ data[, 1]))})
   DW <- apply(data[, -1], MARGIN = 2, function(X){lmtest::dwtest(data[, 1] ~ X)$p.value})
   autoc <- DW <= 0.05
 
@@ -27,7 +26,11 @@ wave.length <- function(interval = NULL, data){
   resid.sign2[nrow(resid.sign2), ] <- resid.sign[nrow(resid.sign), ]
   wave.length <- apply(resid.sign2, 2, function(x){sum(x != 0)/sum(x == 0)})*(data[2, 1] - data[1, 1])
   amplitud <-  apply(resid, 2, function(x){abs(max(x) - min(x))})
-  return(data.frame(WL = wave.length, Amplitud = amplitud))
+
+
+  areas <- apply(abs(resid) , 2, function(x){trapz(x = data[, 1], y = x)})
+
+  return(data.frame(WL = wave.length, Amplitud = amplitud, OA = areas, Dispersion = sigma))
 }
 
 
@@ -313,8 +316,8 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     plot(PCA$x[,1], PCA$x[,2], xlab = paste("PC1", round(PCA$sdev[1]^2/sum(PCA$sdev^2)*100,2),"%"), ylab = paste("PC2", round(PCA$sdev[2]^2/sum(PCA$sdev^2)*100,2),"%"), main = z, col = 0)
     text(PCA$x[,1], PCA$x[,2], labels = colnames(datosO)[-1], col = as.numeric(asignacion))
     dev.off()
-    tabla.medias <- apply(cbind(areas, alturas, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, mean)
-    tabla.desviaciones <- apply(cbind(areas, alturas, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, sd)/sqrt(grupitos)
+    tabla.medias <- apply(cbind(areas, alturas, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, mean)
+    tabla.desviaciones <- apply(cbind(areas, alturas, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, sd)/sqrt(grupitos)
 
     #ALTURAS
     pdf(paste(results.dir,"/Barras.Altura", z, ".pdf", sep = ""))
@@ -344,22 +347,50 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     box(bty = "l")
     dev.off()
 
+    #OA
+    pdf(paste(results.dir,"/Barras.OA", z, ".pdf", sep = ""))
+    media.OA <- tabla.medias[,grep("OA", colnames(tabla.medias))]
+    media.OA[is.na(media.OA)] <- 0
+    desviacion.OA <- tabla.desviaciones[,grep("oscilation.index", colnames(tabla.desviaciones))]
+    desviacion.OA[is.na(desviacion.OA)] <- 0
+
+    #diagramas de barras
+    barras <- barplot(media.OA, beside = TRUE, las = 2, cex.names = 1, ylim = c(min(pretty(media.OA - desviacion.OA)), max(pretty(media.OA + desviacion.OA*1.2))), col = 2:(length(grupitos)+1), main = z, xpd = F)
+    arrows(barras, media.OA + desviacion.OA, barras, media.OA - desviacion.OA, angle = 90, code = 3)
+    legend("topright", legend = paste("n = ", grupitos), fill = 2:(length(grupitos)+1))
+    box(bty = "l")
+    dev.off()
+
+    #Dispersion
+    pdf(paste(results.dir,"/Barras.sigma", z, ".pdf", sep = ""))
+    media.Dispersion <- tabla.medias[,grep("Dispersion", colnames(tabla.medias))]
+    media.Dispersion[is.na(media.Dispersion)] <- 0
+    desviacion.Dispersion <- tabla.desviaciones[,grep("Dispersion", colnames(tabla.desviaciones))]
+    desviacion.Dispersion[is.na(desviacion.Dispersion)] <- 0
+
+    #diagramas de barras
+    barras <- barplot(media.Dispersion, beside = TRUE, las = 2, cex.names = 1, ylim = c(min(pretty(media.Dispersion - desviacion.Dispersion)), max(pretty(media.Dispersion + desviacion.Dispersion*1.2))), col = 2:(length(grupitos)+1), main = z, xpd = F)
+    arrows(barras, media.Dispersion + desviacion.Dispersion, barras, media.Dispersion - desviacion.Dispersion, angle = 90, code = 3)
+    legend("topright", legend = paste("n = ", grupitos), fill = 2:(length(grupitos)+1))
+    box(bty = "l")
+    dev.off()
+
 
     #tablas medias desviaciones
-    descriptiva <- matrix(0, ncol = (2*length(grupitos)+2), nrow = (length(estimulos[,1])+2))
-    rownames(descriptiva) <- c(as.character(estimulos[,1]), "n", "OI")
+    descriptiva <- matrix(0, ncol = (2*length(grupitos)+2), nrow = (length(estimulos[,1])+4))
+    rownames(descriptiva) <- c(as.character(estimulos[,1]), "n", "OI", "OA", "sigma")
     colnames(descriptiva) <- c(paste(rep(c("media", "desviación"), length(grupitos)), rep(1:length(grupitos), each = 2)), "Media Global", "Desviación Global")
     descriptiva <- data.frame(descriptiva)
     for(i in 1:length(grupitos)){
-      descriptiva[,(2*(i-1)+1)] <- c(signif(t(media.altura)[,i],2),grupitos[i], t(media.OI)[,i])
-      descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ", t(desviacion.OI)[,i])
+      descriptiva[,(2*(i-1)+1)] <- c(signif(t(media.altura)[,i],2),grupitos[i], t(media.OI)[,i], t(media.OA)[,i], t(media.Dispersion)[,i])
+      descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ", t(desviacion.OI)[,i], t(desviacion.OA)[,i] , t(desviacion.Dispersion)[,i])
     }
     if(length(estimulos[,1]) > 1){
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos), mean(oscilation.index))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "", sd(oscilation.index))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
     }else{
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos), mean(oscilation.index))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "", sd(oscilation.index))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
     }
 
     write.csv2(descriptiva, paste(results.dir,"/descriptiva", z, ".csv", sep = ""))
