@@ -25,8 +25,6 @@ recopilationROI <- function(column = "oscilation.index", threshold = 1.05, categ
     datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
   }
   datos <- cbind(datos, Mean = media)
-  datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
-  rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   write.csv2(datos, file = file.path(directory, paste("resumen", column, ".csv", sep = "")))
 }
 
