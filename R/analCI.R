@@ -1,3 +1,31 @@
+#' @title summary from those data which fulfill the condition of interest
+#' @description This functions provide a summary, for each experiment, and all of them into a only one .csv, of data which fulfill a condition of interest.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return .csv
+#' @export recopilationROI
+
+recopilationROI <- function(column = "oscilation.index", threshold = 1.05, category = category){
+  directory <- getwd()
+  datosfich <- file.path(directory, "resultados")
+  ficheros <- dir(datosfich)
+  ficheros.datos <- ficheros[grep("datos", ficheros)]
+  datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 5))
+  colnames(datos) <- c("Experiment", "category", "No", "Yes", "Mean")
+  for(i in 1:length(ficheros.datos)){
+    datos.tabla <- read.csv2(file.path(datosfich, ficheros.datos[i]))
+    #Nombre del experimento
+    exp.name <- sub("datos", x = ficheros.datos[i], replacement = "")
+    exp.name <- sub(".csv", x = exp.name, replacement = "")
+    #Seleccion variable de interes (column)
+    variable <- datos.tabla[, column]
+    tabla <- as.numeric(table(variable >= threshold))
+    media <- mean(datos.tabla[variable >= threshold, column])
+    datos[i, ] <- c(exp.name, as.character(category[i]), tabla, media)
+  }
+  write.csv2(datos, file = file.path(directory, paste("resumen", column, ".csv", sep = "")))
+}
+
 #' @title wave length
 #' @description This functions provide the number of peaks, oscilations.
 #' @author Enrique Perez_Riesgo
