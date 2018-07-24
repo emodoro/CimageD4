@@ -10,8 +10,9 @@ recopilationROI <- function(column = "oscilation.index", threshold = 1.05, categ
   datosfich <- file.path(directory, "resultados")
   ficheros <- dir(datosfich)
   ficheros.datos <- ficheros[grep("datos", ficheros)]
-  datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 5))
-  colnames(datos) <- c("Experiment", "category", "No", "Yes", "Mean")
+  datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 4))
+  colnames(datos) <- c("Experiment", "category", "No", "Yes")
+  media <- as.vector(matrix(0, nrow = length(ficheros.datos), ncol = 1))
   for(i in 1:length(ficheros.datos)){
     datos.tabla <- read.csv2(file.path(datosfich, ficheros.datos[i]))
     #Nombre del experimento
@@ -20,9 +21,12 @@ recopilationROI <- function(column = "oscilation.index", threshold = 1.05, categ
     #Seleccion variable de interes (column)
     variable <- datos.tabla[, column]
     tabla <- as.numeric(table(variable >= threshold))
-    media <- mean(datos.tabla[variable >= threshold, column])
-    datos[i, ] <- c(exp.name, as.character(category[i]), tabla, media)
+    media[i] <- mean(datos.tabla[variable >= threshold, column])
+    datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
   }
+  datos <- cbind(datos, Mean = media)
+  datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
+  rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   write.csv2(datos, file = file.path(directory, paste("resumen", column, ".csv", sep = "")))
 }
 
