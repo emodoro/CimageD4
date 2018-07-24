@@ -231,10 +231,16 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       altura.total <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, max)
       if(!is.null(Nisoldipina)){ #Primero se evalua si Nisoldipina es NULL, y en caso negativo, si el estimulo i esta dentro del intervalo de accion de la nisoldipina
         print(Nisoldipina)
-        if(Nisoldipina[1] <= datos[sum(datos$Time < estimulos[i,2]), 1]  & Nisoldipina[2] >= datos[sum(datos$Time < (estimulos[i,3])+1), 1]){
+        if(Nisoldipina[1] <= datos[sum(datos$Time < estimulos[i,2]), 1]  & Nisoldipina[2] >= datos[sum(datos$Time < (estimulos[i,3])+1), 1])
+        {
           altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
           print(altura.total)
         }
+      }
+      if(length(grep("2f", estimulos[i, 1])) != 0)
+      {
+        altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
+        print(altura.total)
       }
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)

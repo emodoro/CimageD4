@@ -13,6 +13,8 @@ ui <- shinyUI(fluidPage(
                  radioButtons("Units", "Units", list("ms", "s")),
                  radioButtons("remove", "Remove any ROI?", list("TRUE", "FALSE")),
                  fileInput("removefile", h3("Introducir remove.csv"), accept = c(".csv")),
+                 radioButtons("cellone", h3("One Cell?"), list("TRUE", "FALSE")),
+                 numericInput("cell", label = "cell number", value = 1),
                  radioButtons("Outliers", "Remove Multivariate Outliers?", list("TRUE", "FALSE")),
                  radioButtons("Smooth", "Signal Smooth?", list("TRUE", "FALSE")),
                  radioButtons("IntervalSel", "Select Interval?", list("TRUE", "FALSE")),
@@ -55,7 +57,7 @@ server <- shinyServer(
         outliers <- as.numeric(which(dmR > p + 3 * sqrt(2 * p)))
         return(outliers)
       }
-      
+
       #Estimulos
       estimulos <- input$estimulos$datapath
       estimulos <- read.csv2(estimulos, header = TRUE)
@@ -128,6 +130,12 @@ server <- shinyServer(
             print(altura.total)
           }
         }
+        if(length(grep("2f", estimulos[i, 1])) != 0)
+        {
+          altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
+          print(altura.total)
+        }
+
         #Selecciona el intervalo del estimulo y busca el min
         altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
         #Aqui tiene en cuenta si el estimulo hace bajar o subir la senal
@@ -167,25 +175,36 @@ server <- shinyServer(
 
 
       #Plot
-      plot(datos$Time, datos[,2], type = "l", col = 2, xlab = " ", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), axes = FALSE)
-      axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 1), by = 0.1))
-      for(i in 3:dim(datos)[2]){
-        lines(datos$Time, datos[,i], type = "l", col = i, lwd = 2)
+      if(input$cellone == TRUE){
+        plot(datos$Time, datos[,(input$cell + 1)], type = "l", col = 1, xlab = " ", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,(input$cell + 1)])+max(datos[,(input$cell + 1)])*0.25), axes = FALSE)
+        axis(side = 2, at = seq(0, round(max(datos[,(input$cell + 1)])+max(datos[,(input$cell + 1)])*0.25, 1), by = 0.1))
+        color <- estimulos[,1]
+        for(i in 1:dim(estimulos)[1]){
+          lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
+          text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
+        }
+      }else{
+        plot(datos$Time, datos[,2], type = "l", col = 2, xlab = " ", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), axes = FALSE)
+        axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 1), by = 0.1))
+        for(i in 3:dim(datos)[2]){
+          lines(datos$Time, datos[,i], type = "l", col = i, lwd = 2)
+        }
+        if(input$legends == TRUE){
+          legend("topleft", legend = colnames(datos)[-1], col = 2:dim(datos)[2], cex = 0.5, lty = 1, ncol = 2)
+        }
+        color <- estimulos[,1]
+        for(i in 1:dim(estimulos)[1]){
+          lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
+          text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
+        }
+        lines(c(max(datos[,1])-1.5, max(datos[,1])-0.5), c(max(datos[,-1])+0.15*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.15), lty = 1, col = "black", lwd = 10)
+        text(mean(c(max(datos[,1])-1.5, max(datos[,1])-0.5)),c(max(datos[,-1])+0.20*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.20), labels = "1min")
+        if(input$IntervalSel == TRUE){
+          abline(v = interval[2], col = "red")
+        }
       }
-      if(input$legends == TRUE){
-        legend("topleft", legend = colnames(datos)[-1], col = 2:dim(datos)[2], cex = 0.5, lty = 1, ncol = 2)
-      }
-      color <- estimulos[,1]
-      for(i in 1:dim(estimulos)[1]){
-        lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
-        text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
-      }
-      lines(c(max(datos[,1])-1.5, max(datos[,1])-0.5), c(max(datos[,-1])+0.15*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.15), lty = 1, col = "black", lwd = 10)
-      text(mean(c(max(datos[,1])-1.5, max(datos[,1])-0.5)),c(max(datos[,-1])+0.20*max(datos[,-1]), max(datos[,-1])+max(datos[,-1])*0.20), labels = "1min")
-      if(input$IntervalSel == TRUE){
-        abline(v = interval[2], col = "red")
-      }
-      
+
+
       output$tabla <- renderTable({cbind(alturas, oscilation.index)}, rownames = TRUE)
       })
 
