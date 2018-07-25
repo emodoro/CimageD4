@@ -20,7 +20,7 @@ recopilationROI <- function(column = "oscilation.index", threshold = 1.05, categ
     exp.name <- sub(".csv", x = exp.name, replacement = "")
     #Seleccion variable de interes (column)
     variable <- datos.tabla[, column]
-    tabla <- as.numeric(table(variable >= threshold))
+    tabla <- c(sum(variable < threshold), sum(variable >= threshold))
     media[i] <- mean(datos.tabla[variable >= threshold, column])
     datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
   }
