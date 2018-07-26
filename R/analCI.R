@@ -5,10 +5,11 @@
 #' @return .csv
 #' @export recopilationROI
 
-recopilationROI <- function(column = "oscilation.index", threshold = 1.05, category = category){
+recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index", threshold = 1.05, category = category, centr.par = "median", disp.par = "mad"){
   directory <- getwd()
   datosfich <- file.path(directory, "resultados")
   ficheros <- dir(datosfich)
+  ficheros <- ficheros[-grep("datosO", ficheros)]
   ficheros.datos <- ficheros[grep("datos", ficheros)]
   datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 4))
   colnames(datos) <- c("Experiment", "category", "No", "Yes")
@@ -18,16 +19,30 @@ recopilationROI <- function(column = "oscilation.index", threshold = 1.05, categ
     #Nombre del experimento
     exp.name <- sub("datos", x = ficheros.datos[i], replacement = "")
     exp.name <- sub(".csv", x = exp.name, replacement = "")
-    #Seleccion variable de interes (column)
-    variable <- datos.tabla[, column]
+    #Seleccion variable de interes where asses the condition (column)
+    variable <- datos.tabla[, variables]
     tabla <- c(sum(variable < threshold), sum(variable >= threshold))
-    media[i] <- mean(datos.tabla[variable >= threshold, column])
+    #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
+    if(centr.par == "median"){
+      media[i] <- median(datos.tabla[variable >= threshold, column])
+    }
+    if(centr.par == "mean"){
+      media[i] <- mean(datos.tabla[variable >= threshold, column])
+    }
     datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
   }
-  datos <- cbind(datos, Mean = media)
-  datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
-  rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
-  write.csv2(datos, file = file.path(directory, paste("resumen", column, ".csv", sep = "")))
+
+  if(centr.par == "median"){
+    datos <- cbind(datos, Median = media)
+    datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Median = c(NA, NA, NA, NA, median(datos$Median)), Sd = c(NA, NA, NA, NA, mad(datos$Median)))
+    rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Median", "mad")
+  }
+  if(centr.par == "mean"){
+    datos <- cbind(datos, Mean = media)
+    datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
+    rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
+  }
+  write.csv2(datos, file = file.path(directory, paste("resumen", variables, centr.par, ".csv", sep = "")))
 }
 
 #' @title wave length
