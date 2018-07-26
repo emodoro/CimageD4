@@ -164,8 +164,11 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     dir.create(file.path(directory, "resultados"))
   }
   results.dir <- file.path(directory, "resultados")
-  archivos <- archivos[archivos != c("recopilarDatos.Rmd")]
-  archivos <- archivos[archivos != "resultados"]
+  if(length(grep("resultados", archivos)) != 0){archivos <- archivos[-(grep("resultados", archivos))]}
+  if(length(grep(".Rmd", archivos)) != 0){archivos <- archivos[-(grep(".Rmd", archivos))]}
+  if(length(grep(".csv", archivos)) != 0){archivos <- archivos[-(grep(".csv", archivos))]}
+  if(length(grep(".xls", archivos)) != 0){archivos <- archivos[-(grep(".xls", archivos))]}
+  if(length(grep(".txt", archivos)) != 0){archivos <- archivos[-(grep(".txt", archivos))]}
   grupo.numero <- 0
   #read .txt
   for(z in archivos){
@@ -266,13 +269,12 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
         if(Nisoldipina[1] <= datos[sum(datos$Time < estimulos[i,2]), 1]  & Nisoldipina[2] >= datos[sum(datos$Time < (estimulos[i,3])+1), 1])
         {
           altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
-          print(altura.total)
         }
       }
+      #Segundas fases
       if(length(grep("2f", estimulos[i, 1])) != 0)
       {
         altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
-        print(altura.total)
       }
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
@@ -301,6 +303,24 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     #table
     write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index), paste(results.dir,"/datos", z, ".csv", sep = ""))
 
+
+    #Decidir si hay o no señal
+    dispersion <- longitud.onda$Dispersion
+    datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion)
+    colnames(datos.responden)[1:length(estimulos[, 1])] <- as.character(estimulos[, 1])
+    phase2 <- grep("2f", estimulos[, 1])
+    decision <- t(apply(datos.responden, 1, function(x){
+      signal <- x[-length(x)] >= as.numeric(x[length(x)])*3.29
+      signal.lag <- x[-length(x)][phase2-1] >= as.numeric(x[length(x)])*3.29 #deteccion de la primera fase
+      signal.2 <- x[-length(x)][phase2] >= as.numeric(x[length(x)])*1.645 #decision de si hay segunda fase
+      signal[phase2] <- signal.lag * signal.2 #para que haya segunda fase ha de cumplirse que haya primera
+      return(signal)
+    }))
+
+
+    #tabla total
+    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
+
     #Outliers Se tiene en cuenta que el numero de observaciones no sea menor que el numero de variables. En ese caso, no se obtienen los outliers
     datosO <- datos #En el gráfico del final sin outliers se usará datosO en lugar de datos, por si a caso se han eliminado outliers cumpliendose que p >= n
     if(outlier == TRUE && nrow(areas) > ncol(cbind(areas, alturas))){
@@ -312,8 +332,10 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
         longitud.onda <- longitud.onda[-outliers, ]
         oscilation.index <- oscilation.index[-outliers]
         datosO <- datos[,-(outliers+1)]
+        decision <- decision[-outliers, ]
       }
     }
+
 
     #distancias
     distancias <- dist(scale(cbind(areas, alturas, oscilation.index)), method = "euclidean")
@@ -336,7 +358,11 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     dev.off()
     kmedioides <- cluster::pam(scale(cbind(areas, alturas, oscilation.index)), grupos[grupo.numero])
     grupos2 <- cutree(hclust(distancias), grupos[grupo.numero])
-    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2), paste(results.dir,"/datos", z, ".csv", sep = ""))
+
+    #tabla total
+    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2, decision), paste(results.dir,"/datosOut", z, ".csv", sep = ""))
+
+    #Grupos segun seleccion en argumento
     if(modo == "Kmedioids"){
       grupitos = as.numeric(table(kmedioides$clustering))
       asignacion <- kmedioides$clustering
@@ -451,6 +477,6 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     lines(c(max(datosO[,1])-1.5, max(datosO[,1])-0.5), c(max(datosO[,-1])+0.15*max(datosO[,-1]), max(datosO[,-1])+max(datosO[,-1])*0.15), lty = 1, col = "black", lwd = 10)
     text(mean(c(max(datosO[,1])-1.5, max(datosO[,1])-0.5)),c(max(datosO[,-1])+0.20*max(datosO[,-1]), max(datosO[,-1])+max(datosO[,-1])*0.20), labels = "1min")
     dev.off()
-
+    print(paste("Exp", z, "(", grep(z, archivos), "of", length(archivos),")"))
   }
 }
