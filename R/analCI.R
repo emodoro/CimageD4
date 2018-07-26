@@ -169,7 +169,7 @@ mahOutlier <- function(X){
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0) {
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.85) {
   #directories
   if(is.null(directory)){
     directory <- getwd()
@@ -288,6 +288,13 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     }
     #Alturas
     alturas <- data.frame(matrix(0,ncol=(dim(estimulos)[1]+2), nrow = dim(datos)[2]-1)) #Matriz de dimension ROIS X Estimulos+1
+    #pendiente
+    pendientesL <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    pendientesU <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    pendientes <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+
+
+
     y.estimulos <- rbind(y.estimulosS, y.estimulosE) #Se une la matriz de registro para principio del estimulo con la del final del estimulo para cada ROI
     tiempos <- as.numeric(rownames(y.estimulos)) #Los tiempos de principio y fin de estimulo segun tiempo regustrado
     alturas[,(dim(alturas)[2]-1)] <- as.numeric(datos[1,-1]) #datos basales inicio
@@ -301,13 +308,19 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
         print(Nisoldipina)
         if(Nisoldipina[1] <= datos[sum(datos$Time < estimulos[i,2]), 1]  & Nisoldipina[2] >= datos[sum(datos$Time < (estimulos[i,3])+1), 1])
         {
-          altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
+          altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])),-1])
         }
       }
       #Segundas fases
       if(length(grep("2f", estimulos[i, 1])) != 0)
       {
-        altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])+1),-1])
+        Y <- datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),1]
+        altura.total <- apply(datos[sum(datos$Time < estimulos[i,3]):(sum(datos$Time < estimulos[(i + 1),2]) - 3),-1], 2, median)
+
+        pendientesL[i] <- apply(datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[1, ]
+        pendientesU[i] <- apply(datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[2, ]
+        pendientes[i] <- sign(pendientesL[i]) * sign(pendientesU[i])
+
       }
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
@@ -315,6 +328,9 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       alturas[,i] <- apply(rbind(altura.total, altura.total.min, as.numeric(y.estimulosS[i,])), 2, FUN = function(x){ifelse(abs(x[1] - x[3]) >= abs(x[2] - x[3]), x[1] - x[3], x[2] - x[3])}) #corrige por el valor de respuesta (min) previo al estimulo
       colnames(alturas)[i] <- paste("ALTURA", i, sep="")
     }
+
+    write.csv2(cbind(pendientesL, pendientes, pendientesU), paste(results.dir,"/pendientes", z, ".csv", sep = ""))
+
     rownames(alturas) <- colnames(datos)[-1] #Nombra segun los ROIs
     #variables alturas
     datos.basal <- datos
@@ -342,11 +358,12 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion)
     colnames(datos.responden)[1:length(estimulos[, 1])] <- as.character(estimulos[, 1])
     phase2 <- grep("2f", estimulos[, 1])
-    decision <- t(apply(datos.responden, 1, function(x){
-      signal <- x[-length(x)] >= as.numeric(x[length(x)])*3.29
-      signal.lag <- x[-length(x)][phase2-1] >= as.numeric(x[length(x)])*3.29 #deteccion de la primera fase
-      signal.2 <- x[-length(x)][phase2] >= as.numeric(x[length(x)])*1.645 #decision de si hay segunda fase
-      signal[phase2] <- signal.lag * signal.2 #para que haya segunda fase ha de cumplirse que haya primera
+    decision <- t(apply(cbind(datos.responden, pendientes), 1, function(x){
+      signal <- x[1:nrow(estimulos)] >= as.numeric(x[(nrow(estimulos)+1)])*3.29
+      signal.lag <- x[phase2-1] >= as.numeric(x[(nrow(estimulos)+1)])*3.29 #deteccion de la primera fase
+      signal.2 <- x[phase2] >= as.numeric(x[(nrow(estimulos)+1)])*1.645 #decision de si hay segunda fase
+      slopes <- x[(phase2 + nrow(estimulos)+1)] == -1
+      signal[phase2] <- signal.lag * signal.2  #para que haya segunda fase ha de cumplirse que haya primera
       return(signal)
     }))
 
