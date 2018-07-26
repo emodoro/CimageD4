@@ -169,16 +169,27 @@ mahOutlier <- function(X){
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE){
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0) {
   #directories
   if(is.null(directory)){
     directory <- getwd()
   }
   archivos <- dir(directory)
-  if(length(grep(pattern = "resultados", archivos)) == 0){
-    dir.create(file.path(directory, "resultados"))
+
+  if(outlier == TRUE){
+    if(length(grep(pattern = "resultadosOUT", archivos)) == 0){
+      dir.create(file.path(directory, "resultadosOUT"))
+    }
+    results.dir <- file.path(directory, "resultadosOUT")
   }
-  results.dir <- file.path(directory, "resultados")
+  if(outlier == FALSE){
+    if(length(grep(pattern = "resultados", archivos)) == 0){
+      dir.create(file.path(directory, "resultados"))
+    }
+    results.dir <- file.path(directory, "resultados")
+  }
+
+
   if(length(grep("resultados", archivos)) != 0){archivos <- archivos[-(grep("resultados", archivos))]}
   if(length(grep(".Rmd", archivos)) != 0){archivos <- archivos[-(grep(".Rmd", archivos))]}
   if(length(grep(".csv", archivos)) != 0){archivos <- archivos[-(grep(".csv", archivos))]}
@@ -201,16 +212,6 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       datos <- datos[, -(as.numeric(remove.exp$remove)+1)]
     }
 
-    #pdf datos sin suavizar
-    pdf(paste(results.dir,"/Graficos", z, ".pdf", sep = ""))
-    plot(datos$Time, datos[,2], type = "l", col = 2, xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), main = z, axes = FALSE)
-    axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 0), by = 0.1))
-    for(i in 3:dim(datos)[2]){
-      lines(datos$Time, datos[,i], type = "l", col = i, lwd = 2)
-    }
-    if(legend.ROIs == TRUE){
-      legend("topleft", legend = colnames(datos)[-1], col = 2:dim(datos)[2], cex = 0.5, lty = 1, ncol = 2)
-    }
     #Estímulos
     estimulos <- read.csv2(file.path(file.path(directory, z), "estimulos.csv"), header = TRUE)
 
@@ -231,6 +232,23 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       Nisoldipina <- c(datos[sum(datos$Time <= Nisoldipina[1]), 1], datos[sum(datos$Time < Nisoldipina[2]) + 1, 1])
       estimulos <- estimulos[- grep("Nisoldipina", estimulos[,1]), ]
     }
+
+    #elimnar segun min.threshold
+    encima <- apply(datos[, -1] <= min.threshold, MARGIN = 2, sum)
+    datos <- datos[, c(TRUE, encima == 0)]
+
+
+    #pdf datos sin suavizar
+    pdf(paste(results.dir,"/Graficos", z, ".pdf", sep = ""))
+    plot(datos$Time, datos[,2], type = "l", col = 2, xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(ifelse(is.null(y.int[1]), -0.1, y.int[1]), ifelse(is.null(y.int[2]), max(datos[,-1])*1.25, y.int[2]*1.25)) , main = z, axes = FALSE)
+    axis(side = 2, at = seq(0, round(max(datos[,-1])+max(datos[,-1])*0.25, 0), by = 0.1))
+    for(i in 3:dim(datos)[2]){
+      lines(datos$Time, datos[,i], type = "l", col = i, lwd = 2)
+    }
+    if(legend.ROIs == TRUE){
+      legend("topleft", legend = colnames(datos)[-1], col = 2:dim(datos)[2], cex = 0.5, lty = 1, ncol = 2)
+    }
+
     color <- estimulos[,1]
     for(i in 1:dim(estimulos)[1]){
       lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
@@ -477,7 +495,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     #pdf raw data agrupados y sin outliers
     pdf(paste(results.dir,"/Graficos_Grupos", z, ".pdf", sep = ""))
     color <- as.numeric(asignacion) + 1
-    plot(datos$Time, datosO[,2], type = "l", col = color[1], xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(-0.1,max(datosO[,-1])+max(datosO[,-1])*0.25), main = z, axes = FALSE)
+    plot(datos$Time, datosO[,2], type = "l", col = color[1], xlab = "tiempo", ylab = "Ratio F340/380", ylim = c(ifelse(is.null(y.int[1]), -0.1, y.int[1]), ifelse(is.null(y.int[2]), max(datosO[,-1])*1.25, y.int[2]*1.25)), main = z, axes = FALSE)
     axis(side = 2, at = seq(0, round(max(datosO[,-1])+max(datosO[,-1])*0.25, 1), by = 0.1))
     for(i in 3:dim(datosO)[2]){
       lines(datosO$Time, datosO[,i], type = "l", col = color[(i-1)], lwd = 2)
