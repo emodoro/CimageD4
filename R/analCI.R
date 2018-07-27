@@ -5,9 +5,9 @@
 #' @return .csv
 #' @export recopilationROI
 
-recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index", threshold = 1.05, category = category, centr.par = "median", disp.par = "mad"){
+recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index", threshold = 1.05, category = category, centr.par = "median", disp.par = "mad", folder = "resultados"){
   directory <- getwd()
-  datosfich <- file.path(directory, "resultados")
+  datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
   ficheros <- ficheros[-grep("datosO", ficheros)]
   ficheros.datos <- ficheros[grep("datos", ficheros)]
@@ -44,7 +44,6 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", variables, centr.par, ".csv", sep = "")))
 }
-
 #' @title wave length
 #' @description This functions provide the number of peaks, oscilations.
 #' @author Enrique Perez_Riesgo
