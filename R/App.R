@@ -156,6 +156,20 @@ server <- shinyServer(
       rownames(areas) <- colnames(datos)[-1]
 
       #Oscilations Index
+      OI <- function(interval = NULL, data){
+
+        if(is.null(interval)){
+          interval <- c(0, 1)
+        }
+        data <- data[data[, 1] <= interval[2] &  data[, 1] >= interval[1], ]
+        data.lag <- data[- nrow(data), ]
+        diferencia <- data[-1, ]- data.lag
+        diferencia2 <- diferencia ^ 2
+        d2 <- diferencia2[, -1] + diferencia2[, 1]
+        distancia <- sqrt(d2)
+        IO <- colSums(distancia)/(data[nrow(data), 1]- data[1, 1])
+        return(IO)
+      }
       oscilation.index <- OI(interval = interval, data = datosraw)
 
 
