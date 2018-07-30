@@ -274,7 +274,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       estimulos[1, 2] <- datos$Time[2]
     } #En caso de que el estimulo inicial empiece a tiempo cero, se corrige para que sea el instante posterior y no de posteriormente errores
     for(i in 1:dim(estimulos)[1]){
-      posicionS <- datos[datos$Time < estimulos[i,2],] #TRUE todos los valores cuyo tiempo sea interior al del estimulo
+      posicionS <- datos[datos$Time < estimulos[i,2],] #TRUE todos los valores cuyo tiempo sea inferior al del estimulo
       y.estimulosS[i,] <- as.numeric(posicionS[dim(posicionS)[1],-1]) #Se fija el valor de respuesta correspondiente al ultimo TRUE de posicionS, y sera el valor de respuesta cuando comienza el estimulo (basal por estimulo)
       rownames(y.estimulosS)[i] <- as.character(posicionS[dim(posicionS)[1],1]) #Se guarda a que tiempo comienza el estimulo segun los datos temporales registrados
       y.estimulosE[i,] <- as.numeric(datos[datos$Time > estimulos[i,3],-1][1,]) #Aqui el primer true corresponde con el fin del estimulo
@@ -287,21 +287,29 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     }
     #Alturas
     alturas <- data.frame(matrix(0,ncol=(dim(estimulos)[1]+2), nrow = dim(datos)[2]-1)) #Matriz de dimension ROIS X Estimulos+1
-    #pendiente
+
+
+    #Definir objetos para guardar pendiente,  maximo, coefiientes de regresion, ...
     pendientesL <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     pendientesU <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     pendientes <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    intercepto <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    pendientecoef <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    maximos1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
 
 
 
     y.estimulos <- rbind(y.estimulosS, y.estimulosE) #Se une la matriz de registro para principio del estimulo con la del final del estimulo para cada ROI
-    tiempos <- as.numeric(rownames(y.estimulos)) #Los tiempos de principio y fin de estimulo segun tiempo regustrado
+    tiempos <- as.numeric(rownames(y.estimulos)) #Los tiempos de principio y fin de estimulo segun tiempo registrado
     alturas[,(dim(alturas)[2]-1)] <- as.numeric(datos[1,-1]) #datos basales inicio
     alturas[,dim(alturas)[2]] <- as.numeric(datos[nrow(datos),-1]) #datos basales final
     colnames(alturas)[(dim(alturas)[2]-1)] <- "BASAL.Principio"
     colnames(alturas)[dim(alturas)[2]] <- "BASAL.Final"
+
+
     for(i in 1:dim(estimulos)[1]){
       #Selecciona el intervalo del estimulo y busca el max
+      intervalo <- c(as.numeric(estimulos[i, 2]), as.numeric(estimulos[i, 3]))
       altura.total <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, max)
       if(!is.null(Nisoldipina)){ #Primero se evalua si Nisoldipina es NULL, y en caso negativo, si el estimulo i esta dentro del intervalo de accion de la nisoldipina
         print(Nisoldipina)
@@ -310,17 +318,38 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
           altura.total <- as.numeric(datos[(sum(datos$Time < estimulos[i,3])),-1])
         }
       }
-      #Segundas fases
-      if(length(grep("2f", estimulos[i, 1])) != 0)
-      {
-        Y <- datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),1]
-        altura.total <- apply(datos[sum(datos$Time < estimulos[i,3]):(sum(datos$Time < estimulos[(i + 1),2]) - 3),-1], 2, median)
+      ###NUEVO
+      #Seleccionar los datos del intervalo del estimulo i y crear un objeto con ellos
+      datos.int <- datos[datos[, 1] > intervalo[1] & datos[, 1] < intervalo[2], ]
+      #Hacer cero el tiempo minimo de datos.int
+      datos.int[, 1] <- datos.int[, 1] - datos.int[1, 1]
+      #Hacer cero el valor inicial de y a tiempo ero(comienzo del estimulo) de datos.int
+      datos.int <- apply(datos.int, 2, function(x){
+        x - x[1]
+      })
 
-        pendientesL[i] <- apply(datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[1, ]
-        pendientesU[i] <- apply(datos[sum(datos$Time < (estimulos[i,3] - 1)):(sum(datos$Time < estimulos[i,3])+3),-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[2, ]
-        pendientes[i] <- sign(pendientesL[i]) * sign(pendientesU[i])
+      Y <- datos.int[,1]
+      #Modelo polin
+      datostiempo <- as.matrix(data.frame(T = datos.int[, 1], T2 = datos.int[, 1]^2, T3 = datos.int[, 1]^3, T4 = datos.int[, 1]^4, T5 = datos.int[, 1]^5, T6 = datos.int[, 1]^6))
 
-      }
+      modelo6 <- apply(datos.int[,-1], 2, function(X){
+        model <- lm(X ~ datostiempo)
+        u <- seq(0, intervalo[2] - intervalo[1], by = 0.1)
+        C6 <- coef(model)
+        colnames(datostiempo) <- c("datostiempoT", paste("datostiempoT", 2:6, sep=""))
+        maximos <- max(predict(model))
+      })
+
+
+      pendientesL[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[1, ]
+      pendientesU[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[2, ]
+      pendientes[i] <- sign(pendientesL[i]) + sign(pendientesU[i])
+      maximos1[i] <- apply(datos.int[1:(nrow(datos.int)/2), -1], 2, max)
+      maximos1[i] <- modelo6
+      intercepto[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[1]})
+      pendientecoef[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[2]})
+
+
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
       #Aquí tiene en cuenta si el estímulo hace bajar o subir la señal
@@ -353,19 +382,34 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
     #Decidir si hay o no señal
-    dispersion <- longitud.onda$Dispersion
-    datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion)
+    dispersion <- longitud.onda$Dispersion*1.645 ##¿error?
+    datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion, maximos1, intercepto, pendientecoef, pendientes)
     colnames(datos.responden)[1:length(estimulos[, 1])] <- as.character(estimulos[, 1])
+    colnames(datos.responden)[(length(estimulos[, 1])+2):(2*length(estimulos[, 1])+1)] <- paste("Max", as.character(estimulos[, 1]))
+    colnames(datos.responden)[(2*length(estimulos[, 1])+2):(3*length(estimulos[, 1])+1)] <- paste("interc", as.character(estimulos[, 1]))
+    colnames(datos.responden)[(3*length(estimulos[, 1])+2):(4*length(estimulos[, 1])+1)] <- paste("pend", as.character(estimulos[, 1]))
+    colnames(datos.responden)[(4*length(estimulos[, 1])+2):(5*length(estimulos[, 1])+1)] <- paste("signPend", as.character(estimulos[, 1]))
     phase2 <- grep("2f", estimulos[, 1])
-    decision <- t(apply(cbind(datos.responden, pendientes), 1, function(x){
-      signal <- x[1:nrow(estimulos)] >= as.numeric(x[(nrow(estimulos)+1)])*3.29
-      signal.lag <- x[phase2-1] >= as.numeric(x[(nrow(estimulos)+1)])*3.29 #deteccion de la primera fase
-      signal.2 <- x[phase2] >= as.numeric(x[(nrow(estimulos)+1)])*1.645 #decision de si hay segunda fase
-      slopes <- x[(phase2 + nrow(estimulos)+1)] == -1
-      signal[phase2] <- signal.lag * signal.2  #para que haya segunda fase ha de cumplirse que haya primera
+
+    decision <- t(apply(datos.responden, 1, function(x){
+      LOQ <- x[(length(estimulos[, 1])+2):(2*length(estimulos[, 1])+1)] >= as.numeric(x[(nrow(estimulos)+1)])*3.29
+
+
+      slopes <-  x[(4*length(estimulos[, 1])+2):(5*length(estimulos[, 1])+1)] <= 0
+      a <- as.numeric(c(x[(2*length(estimulos[, 1])+2):(3*length(estimulos[, 1])+1)]))
+      b <- as.numeric(c(x[(3*length(estimulos[, 1])+2):(4*length(estimulos[, 1])+1)]))
+      LOD2 <- estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b) #el LOD2 es el corte de la reta estimada ocn el Y = LOD
+
+      signal <- LOQ * slopes
+      if(length(phase2) != 0){
+        signal[phase2] <- LOQ * slopes * LOD2  #para que haya segunda fase ha de cumplirse que haya primera
+      }
+
       return(signal)
     }))
 
+    #tabla datos.responden
+    write.csv2(datos.responden, paste(results.dir,"/dat.responden", z, ".csv", sep = ""))
 
     #tabla total
     write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
