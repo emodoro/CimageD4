@@ -382,7 +382,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
     #Decidir si hay o no señal
-    dispersion <- longitud.onda$Dispersion*1.645 ##¿error?
+    dispersion <- longitud.onda$Dispersion ##¿error?
     datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion, maximos1, intercepto, pendientecoef, pendientes)
     colnames(datos.responden)[1:length(estimulos[, 1])] <- as.character(estimulos[, 1])
     colnames(datos.responden)[(length(estimulos[, 1])+2):(2*length(estimulos[, 1])+1)] <- paste("Max", as.character(estimulos[, 1]))
@@ -407,6 +407,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
       return(signal)
     }))
+    colnames(decision) <- as.character(estimulos[, 1])
 
     #tabla datos.responden
     write.csv2(datos.responden, paste(results.dir,"/dat.responden", z, ".csv", sep = ""))
