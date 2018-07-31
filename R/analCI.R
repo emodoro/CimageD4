@@ -168,7 +168,7 @@ mahOutlier <- function(X){
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.85) {
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.95, factor.error = 1.645) {
   #directories
   if(is.null(directory)){
     directory <- getwd()
@@ -296,6 +296,10 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     intercepto <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     pendientecoef <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     maximos1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    alturas1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+
+    #Nombrar los anteriores objetos (columnas, etc)
+    colnames(alturas1) <- paste("ALTURA", as.character(estimulos[, 1]), sep = " ")
 
 
 
@@ -321,12 +325,20 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       ###NUEVO
       #Seleccionar los datos del intervalo del estimulo i y crear un objeto con ellos
       datos.int <- datos[datos[, 1] > intervalo[1] & datos[, 1] < intervalo[2], ]
+
+      #Seleccionar el valor minimo de respuesta, por ROI, entre medio min anter y medio min despues del comienzo del estimulo
+      datos.int.min <- datos[datos[, 1] > (intervalo[1]-0.5) & datos[, 1] < (intervalo[1] + 0.25), ]
+      datos.int.min <- apply(datos.int.min, MARGIN = 2, min)
+
       #Hacer cero el tiempo minimo de datos.int
-      datos.int[, 1] <- datos.int[, 1] - datos.int[1, 1]
-      #Hacer cero el valor inicial de y a tiempo ero(comienzo del estimulo) de datos.int
+      datos.int <- rbind(datos.int.min, datos.int)
+      datos.int[, 1] <- datos[datos[, 1] >= datos[(which(datos[, 1] > intervalo[1]) - 1), 1][1] & datos[, 1] < intervalo[2], 1]
+
+      #Restar a los datos del intervalo el valor mínimo calculado
       datos.int <- apply(datos.int, 2, function(x){
         x - x[1]
       })
+
 
       Y <- datos.int[,1]
       #Modelo polin
@@ -337,15 +349,16 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
         u <- seq(0, intervalo[2] - intervalo[1], by = 0.1)
         C6 <- coef(model)
         colnames(datostiempo) <- c("datostiempoT", paste("datostiempoT", 2:6, sep=""))
-        maximos <- max(predict(model))
+        maximos <- max(predict(model)[1: sum(Y<=1)])
       })
 
 
       pendientesL[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[1, ]
       pendientesU[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[2, ]
       pendientes[i] <- sign(pendientesL[i]) + sign(pendientesU[i])
-      maximos1[i] <- apply(datos.int[1:(nrow(datos.int)/2), -1], 2, max)
+      maximos1[i] <- apply(datos.int[1: sum(Y<=1), -1], 2, max)
       maximos1[i] <- modelo6
+      alturas1[i] <- apply(datos.int[1: sum(Y<=1),-1], 2, max)
       intercepto[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[1]})
       pendientecoef[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[2]})
 
@@ -378,12 +391,12 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
     #table
-    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index), paste(results.dir,"/datos", z, ".csv", sep = ""))
+    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index), paste(results.dir,"/datos", z, ".csv", sep = ""))
 
 
     #Decidir si hay o no señal
-    dispersion <- longitud.onda$Dispersion ##¿error?
-    datos.responden <- cbind(alturas[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion, maximos1, intercepto, pendientecoef, pendientes)
+    dispersion <- longitud.onda$Dispersion * factor.error ##¿error?
+    datos.responden <- cbind(alturas1[, -c((ncol(alturas) - 1): ncol(alturas))], dispersion, maximos1, intercepto, pendientecoef, pendientes)
     colnames(datos.responden)[1:length(estimulos[, 1])] <- as.character(estimulos[, 1])
     colnames(datos.responden)[(length(estimulos[, 1])+2):(2*length(estimulos[, 1])+1)] <- paste("Max", as.character(estimulos[, 1]))
     colnames(datos.responden)[(2*length(estimulos[, 1])+2):(3*length(estimulos[, 1])+1)] <- paste("interc", as.character(estimulos[, 1]))
@@ -396,13 +409,16 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
       slopes <-  x[(4*length(estimulos[, 1])+2):(5*length(estimulos[, 1])+1)] <= 0
+      slopesp <-  x[(4*length(estimulos[, 1])+2):(5*length(estimulos[, 1])+1)] >= 0
       a <- as.numeric(c(x[(2*length(estimulos[, 1])+2):(3*length(estimulos[, 1])+1)]))
       b <- as.numeric(c(x[(3*length(estimulos[, 1])+2):(4*length(estimulos[, 1])+1)]))
-      LOD2 <- estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b) #el LOD2 es el corte de la reta estimada ocn el Y = LOD
-
-      signal <- LOQ * slopes
+      LOD2 <- ((estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)) & slopes) | ((0 >= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)) & slopesp)#el LOD2 es el corte de la reta estimada ocn el Y = LOD
+      #LOD2 <- estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)
+      #signal <- LOQ * slopes
+      signal <- LOQ
       if(length(phase2) != 0){
-        signal[phase2] <- LOQ * slopes * LOD2  #para que haya segunda fase ha de cumplirse que haya primera
+        #signal[phase2] <- LOQ * slopes * LOD2  #para que haya segunda fase ha de cumplirse que haya primera
+        signal[phase2] <- LOQ[phase2] * LOD2[phase2]
       }
 
       return(signal)
@@ -413,7 +429,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     write.csv2(datos.responden, paste(results.dir,"/dat.responden", z, ".csv", sep = ""))
 
     #tabla total
-    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
+    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
 
     #Outliers Se tiene en cuenta que el numero de observaciones no sea menor que el numero de variables. En ese caso, no se obtienen los outliers
     datosO <- datos #En el gráfico del final sin outliers se usará datosO en lugar de datos, por si a caso se han eliminado outliers cumpliendose que p >= n
@@ -454,7 +470,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     grupos2 <- cutree(hclust(distancias), grupos[grupo.numero])
 
     #tabla total
-    write.csv2(cbind(areas, alturas, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2, decision), paste(results.dir,"/datosOut", z, ".csv", sep = ""))
+    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2, decision), paste(results.dir,"/datosOut", z, ".csv", sep = ""))
 
     #Grupos segun seleccion en argumento
     if(modo == "Kmedioids"){
