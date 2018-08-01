@@ -19,17 +19,20 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
     #Nombre del experimento
     exp.name <- sub("datos", x = ficheros.datos[i], replacement = "")
     exp.name <- sub(".csv", x = exp.name, replacement = "")
-    #Seleccion variable de interes where asses the condition (column)
-    variable <- datos.tabla[, variables]
-    tabla <- c(sum(variable < threshold), sum(variable >= threshold))
-    #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
-    if(centr.par == "median"){
-      media[i] <- median(datos.tabla[variable >= threshold, column])
+    if(length(grep(variables, colnames(datos.tabla))) != 0){
+      #Seleccion variable de interes where asses the condition (column)
+      variable <- datos.tabla[, variables]
+      tabla <- c(sum(variable < threshold), sum(variable >= threshold))
+      #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
+      if(centr.par == "median"){
+        media[i] <- median(datos.tabla[variable >= threshold, column])
+      }
+      if(centr.par == "mean"){
+        media[i] <- mean(datos.tabla[variable >= threshold, column])
+      }
+      datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
     }
-    if(centr.par == "mean"){
-      media[i] <- mean(datos.tabla[variable >= threshold, column])
-    }
-    datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
+
   }
 
   if(centr.par == "median"){
@@ -44,7 +47,6 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, ".csv", sep = "")))
 }
-
 #' @title wave length
 #' @description This functions provide the number of peaks, oscilations.
 #' @author Enrique Perez_Riesgo
