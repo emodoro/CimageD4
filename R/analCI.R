@@ -42,8 +42,9 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
     datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   }
-  write.csv2(datos, file = file.path(directory, paste("resumen", variables, centr.par, ".csv", sep = "")))
+  write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, ".csv", sep = "")))
 }
+
 #' @title wave length
 #' @description This functions provide the number of peaks, oscilations.
 #' @author Enrique Perez_Riesgo
@@ -176,13 +177,13 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
   archivos <- dir(directory)
 
   if(outlier == TRUE){
-    if(length(grep(pattern = "resultadosOUT", archivos)) == 0){
+    if(length(grep(pattern = "^resultadosOUT$", archivos)) == 0){
       dir.create(file.path(directory, "resultadosOUT"))
     }
     results.dir <- file.path(directory, "resultadosOUT")
   }
   if(outlier == FALSE){
-    if(length(grep(pattern = "resultados", archivos)) == 0){
+    if(length(grep(pattern = "^resultados$", archivos)) == 0){
       dir.create(file.path(directory, "resultados"))
     }
     results.dir <- file.path(directory, "resultados")
@@ -297,10 +298,11 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     pendientecoef <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     maximos1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
     alturas1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
+    areas1 <- data.frame(matrix(0,ncol=(dim(estimulos)[1]), nrow = dim(datos)[2]-1))
 
     #Nombrar los anteriores objetos (columnas, etc)
     colnames(alturas1) <- paste("ALTURA", as.character(estimulos[, 1]), sep = " ")
-
+    colnames(areas1) <- paste("AREA", as.character(estimulos[, 1]), sep = " ")
 
 
     y.estimulos <- rbind(y.estimulosS, y.estimulosE) #Se une la matriz de registro para principio del estimulo con la del final del estimulo para cada ROI
@@ -361,7 +363,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       alturas1[i] <- apply(datos.int[1: sum(Y<=1),-1], 2, max)
       intercepto[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[1]})
       pendientecoef[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[2]})
-
+      areas1[i] <- apply(datos.int[,-1], 2, function(x){trapz(x = Y, y = x)})/max(Y)
 
       #Selecciona el intervalo del estimulo y busca el min
       altura.total.min <- apply(datos[sum(datos$Time < estimulos[i,2]):(sum(datos$Time < estimulos[i,3])+1),-1], 2, min)
@@ -391,7 +393,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
     #table
-    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index), paste(results.dir,"/datos", z, ".csv", sep = ""))
+    write.csv2(cbind(areas1, alturas1, longitud.onda, oscilation.index), paste(results.dir,"/datos", z, ".csv", sep = ""))
 
 
     #Decidir si hay o no señal
@@ -415,10 +417,10 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       LOD2 <- ((estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)) & slopes) | ((0 >= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)) & slopesp)#el LOD2 es el corte de la reta estimada ocn el Y = LOD
       #LOD2 <- estimulos[, 3]-estimulos[,2] <= (as.numeric(x[length(estimulos[, 1])+1]*2) - a)/as.numeric(b)
       #signal <- LOQ * slopes
-      signal <- LOQ
+      signal <- as.numeric(LOQ)
       if(length(phase2) != 0){
         #signal[phase2] <- LOQ * slopes * LOD2  #para que haya segunda fase ha de cumplirse que haya primera
-        signal[phase2] <- LOQ[phase2] * LOD2[phase2]
+        signal[phase2] <- as.numeric(LOQ[phase2] * LOD2[phase2])
       }
 
       return(signal)
@@ -429,7 +431,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     write.csv2(datos.responden, paste(results.dir,"/dat.responden", z, ".csv", sep = ""))
 
     #tabla total
-    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
+    write.csv2(cbind(areas1, alturas1, longitud.onda, oscilation.index, decision), paste(results.dir,"/datos", z, ".csv", sep = ""))
 
     #Outliers Se tiene en cuenta que el numero de observaciones no sea menor que el numero de variables. En ese caso, no se obtienen los outliers
     datosO <- datos #En el gráfico del final sin outliers se usará datosO en lugar de datos, por si a caso se han eliminado outliers cumpliendose que p >= n
@@ -439,6 +441,8 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       if(length(outliers) != 0){ #Si no hay outliers no se quitan
         areas <- areas[-outliers, ]
         alturas <- alturas[-outliers, ]
+        areas1 <- areas1[-outliers, ]
+        alturas1 <- alturas1[-outliers, ]
         longitud.onda <- longitud.onda[-outliers, ]
         oscilation.index <- oscilation.index[-outliers]
         datosO <- datos[,-(outliers+1)]
@@ -448,7 +452,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
 
 
     #distancias
-    distancias <- dist(scale(cbind(areas, alturas, oscilation.index)), method = "euclidean")
+    distancias <- dist(scale(cbind(areas1, alturas1, oscilation.index)), method = "euclidean")
     grupo.numero <- grupo.numero + 1
     if(is.null(grupos)){
       grupos = rep(3, length(archivos))
@@ -458,7 +462,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       tope <- ifelse(ncol(datosO[,-1]) >= 6, 5, ncol(datosO)-2)
       siluetas <- as.numeric(vector(length = tope-1))
       for (i in 2:tope) {
-        silueta.media <- cluster::silhouette(cluster::pam(scale(cbind(areas, alturas)), k = i), grupos[grupo.numero], dist = distancias)
+        silueta.media <- cluster::silhouette(cluster::pam(scale(cbind(areas1, alturas1)), k = i), grupos[grupo.numero], dist = distancias)
         siluetas[(i-1)] <- mean(silueta.media[,3])
       }
       grupos[grupo.numero] <- which(siluetas == max(siluetas))+1
@@ -466,11 +470,11 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     pdf(paste(results.dir,"/Cluster", z, ".pdf", sep = ""))
     plot(hclust(distancias, method = "ward.D2"), main = z)
     dev.off()
-    kmedioides <- cluster::pam(scale(cbind(areas, alturas, oscilation.index)), grupos[grupo.numero])
+    kmedioides <- cluster::pam(scale(cbind(areas1, alturas1, oscilation.index)), grupos[grupo.numero])
     grupos2 <- cutree(hclust(distancias), grupos[grupo.numero])
 
     #tabla total
-    write.csv2(cbind(areas, alturas1, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2, decision), paste(results.dir,"/datosOut", z, ".csv", sep = ""))
+    write.csv2(cbind(areas1, alturas1, longitud.onda, oscilation.index, grupos.Kmedioids = kmedioides$clustering, grupos.Cluster = grupos2, decision), paste(results.dir,"/datosOut", z, ".csv", sep = ""))
 
     #Grupos segun seleccion en argumento
     if(modo == "Kmedioids"){
@@ -484,14 +488,14 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     require(ggplot2)
     require(ggfortify)
     require(cluster)
-    PCA <- prcomp(cbind(areas, alturas, oscilation.index), scale. = data.scale)
+    PCA <- prcomp(cbind(areas1, alturas1, oscilation.index), scale. = data.scale)
     pdf(paste(results.dir,"/PCA", z, ".pdf", sep = ""))
     #autoplot(PCA, shape = FALSE, label.size = 3)
     plot(PCA$x[,1], PCA$x[,2], xlab = paste("PC1", round(PCA$sdev[1]^2/sum(PCA$sdev^2)*100,2),"%"), ylab = paste("PC2", round(PCA$sdev[2]^2/sum(PCA$sdev^2)*100,2),"%"), main = z, col = 0)
     text(PCA$x[,1], PCA$x[,2], labels = colnames(datosO)[-1], col = as.numeric(asignacion))
     dev.off()
-    tabla.medias <- apply(cbind(areas, alturas, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, mean)
-    tabla.desviaciones <- apply(cbind(areas, alturas, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, sd)/sqrt(grupitos)
+    tabla.medias <- apply(cbind(areas1, alturas1, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, mean)
+    tabla.desviaciones <- apply(cbind(areas1, alturas1, longitud.onda, oscilation.index), MARGIN = 2, FUN = tapply, INDEX=asignacion, sd)/sqrt(grupitos)
 
     #ALTURAS
     pdf(paste(results.dir,"/Barras.Altura", z, ".pdf", sep = ""))
@@ -560,11 +564,11 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       descriptiva[,(2*(i))] <- c(signif(t(desviacion.altura)[,i],2)," ", t(desviacion.OI)[,i], t(desviacion.OA)[,i] , t(desviacion.Dispersion)[,i])
     }
     if(length(estimulos[,1]) > 1){
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, mean), 2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas[,grep("ALTURA", colnames(alturas))], MARGIN = 2, sd),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(apply(alturas1[,grep("ALTURA", colnames(alturas1))], MARGIN = 2, mean), 2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(apply(alturas1[,grep("ALTURA", colnames(alturas1))], MARGIN = 2, sd),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
     }else{
-      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas[,grep("ALTURA", colnames(alturas))]),2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
-      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas[,grep("ALTURA", colnames(alturas))]),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2]-1)] <- c(signif(mean(alturas1[,grep("ALTURA", colnames(alturas1))]),2), sum(grupitos), mean(oscilation.index), mean(longitud.onda$OA), mean(longitud.onda$Dispersion))
+      descriptiva[,(dim(descriptiva)[2])] <- c(signif(sd(alturas1[,grep("ALTURA", colnames(alturas1))]),2), "", sd(oscilation.index), sd(longitud.onda$OA), sd(longitud.onda$Dispersion))
     }
 
     write.csv2(descriptiva, paste(results.dir,"/descriptiva", z, ".csv", sep = ""))
