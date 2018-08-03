@@ -202,12 +202,24 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
   for(z in archivos){
     tequiste <- dir(file.path(directory, z))
     tequiste <-tequiste[grep(".txt", tequiste)]
-    datos <- read.table(file.path(file.path(directory, z), tequiste), header = FALSE, skip = skip)
+    if(length(tequiste) > 1){
+      datos <- read.table(file.path(file.path(directory, z), tequiste[1]), header = FALSE, skip = skip)
+      for(i in tequiste[-1]){
+        datos2 <- read.table(file.path(file.path(directory, z), i), header = FALSE, skip = skip)
+        datos <- cbind(datos, datos2)
+      }
+
+    }else{
+
+      datos <- read.table(file.path(file.path(directory, z), tequiste), header = FALSE, skip = skip)
+    }
+
+
     colnames(datos) <- c("Time", paste("ROI", 1:(dim(datos)[2]-1)))
     #Unidades
     Unidades <- c("ms", "s")
     unidades <- c(6*10^4, 6*10)
-    datos$Time <- datos$Time/ unidades[grep(paste("^", Units, sep = ""), Unidades)]
+    datos$Time <- datos$Time/unidades[grep(paste("^", Units, sep = ""), Unidades)]
     #remove those ROIs whose response is bad
     if(length(grep("remove", dir(file.path(directory, z)))) != 0){
       remove.exp <- read.csv2(file.path(file.path(directory, z), "remove.csv"), header = TRUE)
