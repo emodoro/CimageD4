@@ -1,5 +1,11 @@
 #' @title summary from those data which fulfill the condition of interest
-#' @description This functions provide a summary, for each experiment, and all of them into a only one .csv, of data which fulfill a condition of interest.
+#' @description This functions provide a summary, for each experiment, and provides
+#'     an only .csv file which stores a summary from all experiments assessed where
+#'     cells (measurement units) taken into account to get a summary value for each
+#'     experimental unit are those which fulfill a condition of interest, shuch a
+#'     threshold value (for instance, if oxcilation index is greater or equal to 1.12),
+#'     or equal to 1 if the colomn chosen as condition is the colomn which reports 1 if
+#'     cell is considered as stimulus-responsive and 0 in other case.
 #' @author Enrique Perez_Riesgo
 #' @param grupos
 #' @return .csv
