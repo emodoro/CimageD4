@@ -53,7 +53,7 @@
 
 recopilationROI <- function(column = "AREA.basal", variables = "basal",
                             threshold = 1, category = category, centr.par = "median",
-                            disp.par = "mad", folder = "resultados", direction = "up"){
+                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up"){
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
@@ -122,6 +122,10 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
   pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
+  if(!is.null(cut.X)){
+    response <- response[response <= cut.X]
+    categories <- categories[response <= cut.X]
+  }
   plot(density(response[categories == levels(categories)[1]]), xlim = c(0, max(response)))
   colour = 1
   for(i in levels(categories)[-1]){
