@@ -197,6 +197,7 @@ OIl <- function(interval = NULL, data){
   data.lag <- data[- nrow(data), ]
   diferencia <- data[-1, ]- data.lag
   IOl <- colSums(diferencia)/((nrow(data)-1))
+  IOl <- IOl[-1]
   return(IOl)
 }
 
