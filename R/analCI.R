@@ -62,6 +62,8 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
   datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 4))
   colnames(datos) <- c("Experiment", "category", "No", "Yes")
   media <- as.vector(matrix(0, nrow = length(ficheros.datos), ncol = 1))
+  response <- vector(mode = "numeric")
+  categories <- vector(mode = "character")
   for(i in 1:length(ficheros.datos)){
     datos.tabla <- read.csv2(file.path(datosfich, ficheros.datos[i]))
     #Nombre del experimento
@@ -71,18 +73,27 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
       #Seleccion variable de interes where asses the condition (column)
       variable <- datos.tabla[, variables]
       tabla <- c(sum(variable < threshold), sum(variable >= threshold))
+      #vectors with measurements and categories
+      response <- c(response, variable)
+      categories <- c(categories, rep(as.character(category[i]), length(variable)))
       #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
       if(centr.par == "median"){
         media[i] <- median(datos.tabla[variable >= threshold, column])
+        #vectors with measurements and categories
+        response <- c(response, datos.tabla[variable >= threshold, column])
+        categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
       }
       if(centr.par == "mean"){
         media[i] <- mean(datos.tabla[variable >= threshold, column])
+        #vectors with measurements and categories
+        response <- c(response, datos.tabla[variable >= threshold, column])
+        categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
       }
       datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
     }
 
   }
-
+  categories <- as.factor(categories)
   if(centr.par == "median"){
     datos <- cbind(datos, Median = media)
     datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Median = c(NA, NA, NA, NA, median(datos$Median)), Sd = c(NA, NA, NA, NA, mad(datos$Median)))
@@ -94,7 +105,18 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, ".csv", sep = "")))
+  pdf(file.path(directory, paste(folder,"/density.", column, centr.par, ".pdf", sep = "")))
+  plot(density(response[categories == levels(categories)[1]]), xlim = c(0, max(response)))
+  colour = 1
+  for(i in levels(categories)[-1]){
+    colour = colour +1
+    lines(density(response[categories == i]), col = colour)
+  }
+  dev.off()
 }
+
+
+
 #' @title wave length
 #' @description This functions provide the number of peaks, oscilations.
 #' @author Enrique Perez_Riesgo
