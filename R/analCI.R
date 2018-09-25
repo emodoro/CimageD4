@@ -159,6 +159,27 @@ OI <- function(interval = NULL, data){
 
 
 
+#' @title Oscilations number increment.
+#' @description This functions provide the oscilations index as increment average among every two points.
+#' @author Enrique Perez_Riesgo
+#' @param grupos
+#' @return plots
+#' @export OIl
+
+OIl <- function(interval = NULL, data){
+
+  if(is.null(interval)){ #En caso de ser NULL el intervalo, por defecto se toma el intervalo [0, 1] para estimar el índice de oscilaciones
+    interval <- c(0, 1)
+  }
+  data <- data[data[, 1] <= interval[2] &  data[, 1] >= interval[1], ]
+  data.lag <- data[- nrow(data), ]
+  diferencia <- data[-1, ]- data.lag
+  IOl <- colSums(diferencia)/((nrow(data)-1))
+  return(IOl)
+}
+
+
+
 
 #' @title Multivariate outliers.
 #' @description An oultier detection is carried out by applying Mahalanobis distances, where means vetor and correlation matrix is computed with those data whose mahalanobis distance is lower than median of mahalanobis distances.
@@ -450,7 +471,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     rownames(areas) <- colnames(datos)[-1]
 
     #Oscilations Index
-    oscilation.index <- OI(interval = interval, data = datosraw)
+    oscilation.index <- OIl(interval = interval, data = datosraw)
     longitud.onda <- wave.length(interval = interval, data = datosraw)
 
 
