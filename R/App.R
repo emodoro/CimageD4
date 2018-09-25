@@ -196,6 +196,9 @@ server <- shinyServer(
         for(i in 1:dim(estimulos)[1]){
           lines(estimulos[i,2:3], c(0,0), lty = 1, col = as.numeric(color)[i], lwd = 10)
           text(mean(as.numeric(estimulos[i,2:3])), c(-0.05, -0.05), labels = estimulos[i,1])
+          if(input$IntervalSel == TRUE){
+            abline(v = interval[2], col = "red")
+          }
         }
       }else{
         plot(datos$Time, datos[,2], type = "l", col = 2, xlab = " ", ylab = "Ratio F340/380", ylim = c(-0.1,max(datos[,-1])+max(datos[,-1])*0.25), axes = FALSE)

@@ -5,13 +5,55 @@
 #'     experimental unit are those which fulfill a condition of interest, shuch a
 #'     threshold value (for instance, if oxcilation index is greater or equal to 1.12),
 #'     or equal to 1 if the colomn chosen as condition is the colomn which reports 1 if
-#'     cell is considered as stimulus-responsive and 0 in other case.
-#' @author Enrique Perez_Riesgo
-#' @param grupos
+#'     this experimental unit is considered as stimulus-responsive cell and 0 in other case.
+#' @details At first, you have to store each measurement unit data within each experimental
+#'     unit into a .csv file called datosExperimentalUnitName.csv, such that has to have the
+#'     follows columns:
+#'      - CELL ID: Each ROI is a measurement unit, such a cell with in an experiment.
+#'      - Response Variable: For instance, the Area under the curve related to a stimulus of
+#'        interest.
+#'      - Threshold values: This column can also be the Response Variable, such that you are concern with those measurement units whose Response Variable is greater or equal to
+#'        a threshold value, which you stablish in correspondent param of present function.
+#'        Furthermore, the Treshold values column can be other column where a value equal to 1
+#'        means a stimulus-responsive cell, and 0in other case, so you have to type the value 1
+#'        in correspondent param into present function, such that this function, in orther to
+#'        provide a summary value for response variable among the measurement units within each
+#'        experiment, only will take into account those cells whose value into Trehshold Values
+#'        Column is greater or equal to threshold value considered.
+#' @author Enrique Perez_Riesgo & Maria Elena Hernando-Perez
+#' @param column Response Values for each measurement unit (for instance, Area for each cell)
+#' @param variables The column where look for the threshold values. If you are concern with
+#'                  those cells or measurement units which are stimulus-responsive, variables
+#'                  will have to be a column where those responsive-stimulus cells show the
+#'                  value 1 and 0 in other case. Nevertheless, if you are concern with those
+#'                  measurement whose param-column-value is greater or equal to threshold
+#'                  value, then variables-param is the vector which stores the response variable
+#'                  of interest, such a Area under the curve.
+#' @param threshold The threshold value stabilshed. If you are concern with those cells which are
+#'                  stimulus-responsive you wil type 1 for those stimulus-responsive cells and 0
+#'                  in other case. If you are concern with those measurement units whose variables-param
+#'                  column is greater or equal to a value of interest you will type the value of
+#'                  interest.
+#' @param category Factor or character vector with store the level of factor for each experimental
+#'                 unit. For instance, if you are dealing with two kind of mice, WT and KO, the
+#'                 vector might have the follows shape: c(WT, KO, KO, WT, ...)
+#' @param centr.par This param allows you to pick the summary variable for each experimental unit,
+#'                  such a median or mean of responses among all measurement units within
+#'                  experimental unit.
+#' @param disp.par This param allows you to pick the disperssion estimator related to the summary variable
+#'                 for each experimental unit, such a median or mean of responses among all measurement
+#'                 units within experimental unit.
+#' @param folder The name of folder which stores the files called datosExperimentalUnitName.csv, such
+#'               that the relative PATH is the name type into this param, taking into account that the
+#'               work directory is the that where R is running, which you can get by typing pwd() in
+#'               the shell.
+#'
 #' @return .csv
 #' @export recopilationROI
 
-recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index", threshold = 1.05, category = category, centr.par = "median", disp.par = "mad", folder = "resultados"){
+recopilationROI <- function(column = "AREA.basal", variables = "basal",
+                            threshold = 1, category = category, centr.par = "median",
+                            disp.par = "mad", folder = "resultados"){
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
