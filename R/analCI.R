@@ -123,8 +123,8 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
   pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
   if(!is.null(cut.X)){
-    response <- response[response <= cut.X]
     categories <- categories[response <= cut.X]
+    response <- response[response <= cut.X]
   }
   plot(density(response[categories == levels(categories)[1]]), xlim = c(0, max(response)))
   colour = 1
