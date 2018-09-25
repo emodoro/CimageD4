@@ -120,14 +120,15 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
     datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   }
-  write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, ".csv", sep = "")))
-  pdf(file.path(directory, paste(folder,"/density.", column, centr.par, ".pdf", sep = "")))
+  write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
+  pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
   plot(density(response[categories == levels(categories)[1]]), xlim = c(0, max(response)))
   colour = 1
   for(i in levels(categories)[-1]){
     colour = colour +1
     lines(density(response[categories == i]), col = colour)
   }
+  legend("topright", legend = as.character(levels(categories)), col = 1:length(levels(categories)), pch = 16)
   dev.off()
 }
 
