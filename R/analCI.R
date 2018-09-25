@@ -53,7 +53,7 @@
 
 recopilationROI <- function(column = "AREA.basal", variables = "basal",
                             threshold = 1, category = category, centr.par = "median",
-                            disp.par = "mad", folder = "resultados"){
+                            disp.par = "mad", folder = "resultados", direction = "up"){
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
@@ -78,16 +78,32 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
       categories <- c(categories, rep(as.character(category[i]), length(variable)))
       #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
       if(centr.par == "median"){
-        media[i] <- median(datos.tabla[variable >= threshold, column])
-        #vectors with measurements and categories
-        response <- c(response, datos.tabla[variable >= threshold, column])
-        categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
-      }
+        if(direction == "up"){
+          media[i] <- median(datos.tabla[variable >= threshold, column])
+          #vectors with measurements and categories
+          response <- c(response, datos.tabla[variable >= threshold, column])
+          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+        }
+        if(direction == "down"){
+          media[i] <- median(datos.tabla[variable <= threshold, column])
+          #vectors with measurements and categories
+          response <- c(response, datos.tabla[variable <= threshold, column])
+          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+        }
+             }
       if(centr.par == "mean"){
+        if(direction == "up"){
         media[i] <- mean(datos.tabla[variable >= threshold, column])
         #vectors with measurements and categories
         response <- c(response, datos.tabla[variable >= threshold, column])
         categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+        }
+        if(direction == "down"){
+          media[i] <- mean(datos.tabla[variable <= threshold, column])
+          #vectors with measurements and categories
+          response <- c(response, datos.tabla[variable <= threshold, column])
+          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+        }
       }
       datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
     }
@@ -494,7 +510,7 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     rownames(areas) <- colnames(datos)[-1]
 
     #Oscilations Index
-    oscilation.index <- OIl(interval = interval, data = datosraw)
+    oscilation.index <- OI(interval = interval, data = datosraw)
     longitud.onda <- wave.length(interval = interval, data = datosraw)
 
 
