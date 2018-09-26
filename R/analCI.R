@@ -284,7 +284,7 @@ mahOutlier <- function(X){
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.95, factor.error = 1.645) {
+analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.95, factor.error = 1.645, OscInd = "OI") {
   #directories
   if(is.null(directory)){
     directory <- getwd()
@@ -515,7 +515,12 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
     rownames(areas) <- colnames(datos)[-1]
 
     #Oscilations Index
-    oscilation.index <- OI(interval = interval, data = datosraw)
+    if(OscInd == "OI"){
+      oscilation.index <- OI(interval = interval, data = datosraw)
+    }
+    if(OscInd == "OIl"){
+      oscilation.index <- OIl(interval = interval, data = datosraw)
+    }
     longitud.onda <- wave.length(interval = interval, data = datosraw)
 
 
