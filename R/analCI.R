@@ -133,6 +133,8 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
     lines(density(response[categories == i]), col = colour)
   }
   legend("topright", legend = as.character(levels(categories)), col = 1:length(levels(categories)), pch = 16)
+  legend("bottomright", legend = quantile(response))
+  write.csv2(quantile(response), file = file.path(directory, paste("Cuantiles", column, centr.par, direction,".csv", sep = "")))
   dev.off()
 }
 
