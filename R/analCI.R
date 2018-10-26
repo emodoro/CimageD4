@@ -34,6 +34,8 @@
 #'                  in other case. If you are concern with those measurement units whose variables-param
 #'                  column is greater or equal to a value of interest you will type the value of
 #'                  interest.
+#' @param direction This provide the direction related to threshold in terms of you want to keep
+#'                  values lower or greater than threshold
 #' @param category Factor or character vector with store the level of factor for each experimental
 #'                 unit. For instance, if you are dealing with two kind of mice, WT and KO, the
 #'                 vector might have the follows shape: c(WT, KO, KO, WT, ...)
@@ -51,9 +53,9 @@
 #' @return .csv
 #' @export recopilationROI
 
-recopilationROI <- function(column = "AREA.basal", variables = "basal",
-                            threshold = 1, category = category, centr.par = "median",
-                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up"){
+recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index",
+                            threshold = 0, category = category, centr.par = "median",
+                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up", minus = 1, breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5), max.hist = 6){
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
@@ -64,6 +66,8 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
   media <- as.vector(matrix(0, nrow = length(ficheros.datos), ncol = 1))
   response <- vector(mode = "numeric")
   categories <- vector(mode = "character")
+  exp.name.vector <- vector(mode = "character")
+  values <- data.frame(Variable = NULL, Phenotype = NULL, Experiment = NULL)
   for(i in 1:length(ficheros.datos)){
     datos.tabla <- read.csv2(file.path(datosfich, ficheros.datos[i]))
     #Nombre del experimento
@@ -72,10 +76,6 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
     if(length(grep(variables, colnames(datos.tabla))) != 0){
       #Seleccion variable de interes where asses the condition (column)
       variable <- datos.tabla[, variables]
-      tabla <- c(sum(variable < threshold), sum(variable >= threshold))
-      #vectors with measurements and categories
-      response <- c(response, variable)
-      categories <- c(categories, rep(as.character(category[i]), length(variable)))
       #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
       if(centr.par == "median"){
         if(direction == "up"){
@@ -83,20 +83,24 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable >= threshold, column])
           categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+          tabla <- c(sum(variable < threshold), sum(variable >= threshold))
+          exp.name.vector <- c(exp.name.vector, rep(as.character(exp.name), length(datos.tabla[variable >= threshold, column])))
         }
         if(direction == "down"){
           media[i] <- median(datos.tabla[variable <= threshold, column])
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable <= threshold, column])
           categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable <= threshold, column])))
+          exp.name.vector <- c(exp.name.vector, rep(as.character(exp.name), length(datos.tabla[variable <= threshold, column])))
+          tabla <- c(sum(variable < threshold), sum(variable <= threshold))
         }
-             }
+      }
       if(centr.par == "mean"){
         if(direction == "up"){
-        media[i] <- mean(datos.tabla[variable >= threshold, column])
-        #vectors with measurements and categories
-        response <- c(response, datos.tabla[variable >= threshold, column])
-        categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+          media[i] <- mean(datos.tabla[variable >= threshold, column])
+          #vectors with measurements and categories
+          response <- c(response, datos.tabla[variable >= threshold, column])
+          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
         }
         if(direction == "down"){
           media[i] <- mean(datos.tabla[variable <= threshold, column])
@@ -121,6 +125,12 @@ recopilationROI <- function(column = "AREA.basal", variables = "basal",
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
+  write.csv2(data.frame(Respuesta = response, Fenotipo = categories, Experimento = exp.name.vector), file = file.path(directory, paste("RAWdata", column, centr.par, direction,".csv", sep = "")))
+  pdf(file.path(directory, paste(folder,"/histogram.", column, centr.par, direction, ".pdf", sep = "")))
+  for(i in unique(categories)){
+    hist(ifelse((response - minus)[categories == i] > breaks[length(breaks)], breaks[length(breaks)], (response - minus)[categories == i]), breaks = breaks, probability = TRUE, ylim = c(0, max.hist), xlab = variables, main = paste(i, ": ", variables, sep = ""))
+  }
+  dev.off()
   pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
   if(!is.null(cut.X)){
     categories <- categories[response <= cut.X]
