@@ -55,7 +55,8 @@
 
 recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index",
                             threshold = 0, category = category, centr.par = "median",
-                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up", minus = 1, breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5), max.hist = 6){
+                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up", minus = 1,
+                            breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5), max.hist = 6, histogram = FALSE){
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
@@ -126,11 +127,14 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
   }
   write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
   write.csv2(data.frame(Respuesta = response, Fenotipo = categories, Experimento = exp.name.vector), file = file.path(directory, paste("RAWdata", column, centr.par, direction,".csv", sep = "")))
-  pdf(file.path(directory, paste(folder,"/histogram.", column, centr.par, direction, ".pdf", sep = "")))
-  for(i in unique(categories)){
-    hist(ifelse((response - minus)[categories == i] > breaks[length(breaks)], breaks[length(breaks)], (response - minus)[categories == i]), breaks = breaks, probability = TRUE, ylim = c(0, max.hist), xlab = variables, main = paste(i, ": ", variables, sep = ""))
+  if(histogram == TRUE){
+    pdf(file.path(directory, paste(folder,"/histogram.", column, centr.par, direction, ".pdf", sep = "")))
+    for(i in unique(categories)){
+      hist(ifelse((response - minus)[categories == i] > breaks[length(breaks)], breaks[length(breaks)], (response - minus)[categories == i]), breaks = breaks, probability = TRUE, ylim = c(0, max.hist), xlab = variables, main = paste(i, ": ", variables, sep = ""))
+    }
+    dev.off()
   }
-  dev.off()
+
   pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
   if(!is.null(cut.X)){
     categories <- categories[response <= cut.X]
