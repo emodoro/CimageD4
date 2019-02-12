@@ -12,7 +12,8 @@
 #'      - CELL ID: Each ROI is a measurement unit, such a cell with in an experiment.
 #'      - Response Variable: For instance, the Area under the curve related to a stimulus of
 #'        interest.
-#'      - Threshold values: This column can also be the Response Variable, such that you are concern with those measurement units whose Response Variable is greater or equal to
+#'      - Threshold values: This column can also be the Response Variable, such that you are
+#'        concern with those measurement units whose Response Variable is greater or equal to
 #'        a threshold value, which you stablish in correspondent param of present function.
 #'        Furthermore, the Treshold values column can be other column where a value equal to 1
 #'        means a stimulus-responsive cell, and 0in other case, so you have to type the value 1
@@ -54,20 +55,39 @@
 #' @export recopilationROI
 
 recopilationROI <- function(column = "oscilation.index", variables = "oscilation.index",
-                            threshold = 0, category = category, centr.par = "median",
-                            disp.par = "mad", folder = "resultados", cut.X = NULL,direction = "up", minus = 1,
-                            breaks = c(0, 0.1, 0.2, 0.3, 0.4, 0.5), max.hist = 6, histogram = FALSE){
+                            threshold = 0, category = category,
+                            centr.par = "median", disp.par = "mad", folder = "resultados",
+                            cut.X = NULL, direction = "up", minus = 1, breaks = "scott",
+                            max.hist = 6, histogram = FALSE){
+  # Set work directory and   Subdirectory where data sets which are going to be analyzed are stored
   directory <- getwd()
   datosfich <- file.path(directory, folder)
   ficheros <- dir(datosfich)
-  ficheros <- ficheros[-grep("datosO", ficheros)]
+  ficheros <- ficheros[-grep("datosO", ficheros)] # Function which generates data sets create
+                                                  #not only "datosExperiment.name.csv", but also
+                                                  #others such as "datosOutExperiment.name.csv".
+                                                  #Thus, the have to be removed.
   ficheros.datos <- ficheros[grep("datos", ficheros)]
+
+  # Building matrix which will store whole data analysis summary from each experiment
   datos <- data.frame(matrix(0, nrow = length(ficheros.datos), ncol = 4))
   colnames(datos) <- c("Experiment", "category", "No", "Yes")
+
+  # Building vector which will store localization parameters from each experiment
   media <- as.vector(matrix(0, nrow = length(ficheros.datos), ncol = 1))
+
+  # Building vector which will store response from each experiment
   response <- vector(mode = "numeric")
+
+  # Building vector which will store categorical variable from each experiment
   categories <- vector(mode = "character")
+
+  # Building vector which will store the name of the i experiment
   exp.name.vector <- vector(mode = "character")
+
+  # Building vector which will the index of those experiments which not contain the variable of interest
+  indice.na <- vector(mode = "numeric")
+
   values <- data.frame(Variable = NULL, Phenotype = NULL, Experiment = NULL)
   for(i in 1:length(ficheros.datos)){
     datos.tabla <- read.csv2(file.path(datosfich, ficheros.datos[i]))
@@ -77,22 +97,31 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
     if(length(grep(variables, colnames(datos.tabla))) != 0){
       #Seleccion variable de interes where asses the condition (column)
       variable <- datos.tabla[, variables]
-      #column is the column, related to variable, where evaluate the mean. Sometimes could be the same
+      #column is the column, related to variable, where evaluate the mean.
+      #Sometimes could be the same
       if(centr.par == "median"){
         if(direction == "up"){
           media[i] <- median(datos.tabla[variable >= threshold, column])
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable >= threshold, column])
-          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+          categories <- c(categories,
+                          rep(as.character(category[i]),
+                              length(datos.tabla[variable >= threshold, column])))
           tabla <- c(sum(variable < threshold), sum(variable >= threshold))
-          exp.name.vector <- c(exp.name.vector, rep(as.character(exp.name), length(datos.tabla[variable >= threshold, column])))
+          exp.name.vector <- c(exp.name.vector,
+                               rep(as.character(exp.name),
+                                   length(datos.tabla[variable >= threshold, column])))
         }
         if(direction == "down"){
           media[i] <- median(datos.tabla[variable <= threshold, column])
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable <= threshold, column])
-          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable <= threshold, column])))
-          exp.name.vector <- c(exp.name.vector, rep(as.character(exp.name), length(datos.tabla[variable <= threshold, column])))
+          categories <- c(categories,
+                          rep(as.character(category[i]),
+                              length(datos.tabla[variable <= threshold, column])))
+          exp.name.vector <- c(exp.name.vector,
+                               rep(as.character(exp.name),
+                                   length(datos.tabla[variable <= threshold, column])))
           tabla <- c(sum(variable < threshold), sum(variable <= threshold))
         }
       }
@@ -101,53 +130,97 @@ recopilationROI <- function(column = "oscilation.index", variables = "oscilation
           media[i] <- mean(datos.tabla[variable >= threshold, column])
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable >= threshold, column])
-          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable >= threshold, column])))
+          categories <- c(categories,
+                          rep(as.character(category[i]),
+                              length(datos.tabla[variable >= threshold, column])))
+          exp.name.vector <- c(exp.name.vector,
+                               rep(as.character(exp.name),
+                                   length(datos.tabla[variable >= threshold, column])))
+          tabla <- c(sum(variable < threshold), sum(variable <= threshold))
         }
         if(direction == "down"){
           media[i] <- mean(datos.tabla[variable <= threshold, column])
           #vectors with measurements and categories
           response <- c(response, datos.tabla[variable <= threshold, column])
-          categories <- c(categories, rep(as.character(category[i]), length(datos.tabla[variable <= threshold, column])))
+          categories <- c(categories,
+                          rep(as.character(category[i]),
+                              length(datos.tabla[variable <= threshold, column])))
+          exp.name.vector <- c(exp.name.vector,
+                               rep(as.character(exp.name),
+                                   length(datos.tabla[variable <= threshold, column])))
+          tabla <- c(sum(variable < threshold), sum(variable <= threshold))
         }
       }
       datos[i, ] <- c(exp.name, as.character(category[i]), tabla)
+    }else{
+      indice.na <- c(indice.na, i)
     }
-
   }
+  # Remove those rows from those experiments where variable of interest has not been assesed
+  datos <- datos[- indice.na, ]
+  media <- media[- indice.na]
+
   categories <- as.factor(categories)
   if(centr.par == "median"){
     datos <- cbind(datos, Median = media)
-    datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Median = c(NA, NA, NA, NA, median(datos$Median)), Sd = c(NA, NA, NA, NA, mad(datos$Median)))
+    datos <- rbind(datos,
+                   n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA),
+                   Median = c(NA, NA, NA, NA, median(datos$Median, na.rm = TRUE)),
+                   Sd = c(NA, NA, NA, NA, mad(datos$Median, na.rm = TRUE)))
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Median", "mad")
   }
   if(centr.par == "mean"){
     datos <- cbind(datos, Mean = media)
-    datos <- rbind(datos, n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA), Mean = c(NA, NA, NA, NA, mean(datos$Mean)), Sd = c(NA, NA, NA, NA, sd(datos$Mean)))
+    datos <- rbind(datos,
+                   n= c(NA, NA, sum(as.numeric(datos$No)), sum(as.numeric(datos$Yes)), NA),
+                   Mean = c(NA, NA, NA, NA, mean(datos$Mean, na.rm = TRUE)),
+                   Sd = c(NA, NA, NA, NA, sd(datos$Mean, na.rm = TRUE)))
     rownames(datos) <- c(1: (nrow(datos) - 3), "n", "Mean", "Sd")
   }
-  write.csv2(datos, file = file.path(directory, paste("resumen", column, centr.par, direction,".csv", sep = "")))
-  write.csv2(data.frame(Respuesta = response, Fenotipo = categories, Experimento = exp.name.vector), file = file.path(directory, paste("RAWdata", column, centr.par, direction,".csv", sep = "")))
+
+  write.csv2(datos, file = file.path(directory,
+                                     paste("summary", column, centr.par, direction,".csv", sep = "")))
+  write.csv2(data.frame(Respuesta = response,
+                        Fenotipo = categories,
+                        Experimento = exp.name.vector),
+             file = file.path(directory,
+                              paste("RAWdata", column, centr.par, direction,".csv", sep = "")))
   if(histogram == TRUE){
-    pdf(file.path(directory, paste(folder,"/histogram.", column, centr.par, direction, ".pdf", sep = "")))
+    pdf(file.path(directory,
+                  paste(folder,"/histogram.", column, centr.par, direction, ".pdf", sep = "")))
     for(i in unique(categories)){
-      hist(ifelse((response - minus)[categories == i] > breaks[length(breaks)], breaks[length(breaks)], (response - minus)[categories == i]), breaks = breaks, probability = TRUE, ylim = c(0, max.hist), xlab = variables, main = paste(i, ": ", variables, sep = ""))
+      hist(ifelse((response - minus)[categories == i] > breaks[length(breaks)],
+                  breaks[length(breaks)],
+                  (response - minus)[categories == i]),
+           breaks = breaks,
+           probability = TRUE,
+           ylim = c(0, max.hist),
+           xlab = variables,
+           main = paste(i, ": ", variables, sep = ""))
     }
     dev.off()
   }
 
-  pdf(file.path(directory, paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
+  pdf(file.path(directory,
+                paste(folder,"/density.", column, centr.par, direction, ".pdf", sep = "")))
   if(!is.null(cut.X)){
     categories <- categories[response <= cut.X]
     response <- response[response <= cut.X]
   }
-  plot(density(response[categories == levels(categories)[1]]), xlim = c(0, max(response)))
+  plot(density(response[categories == levels(categories)[1]]),
+       xlim = c(0, max(response)))
   colour = 1
   for(i in levels(categories)[-1]){
     colour = colour +1
-    lines(density(response[categories == i]), col = colour)
+    lines(density(response[categories == i]),
+          col = colour)
   }
-  legend("topright", legend = as.character(levels(categories)), col = 1:length(levels(categories)), pch = 16)
-  write.csv2(quantile(response), file = file.path(directory, paste("Cuantiles", column, centr.par, direction,".csv", sep = "")))
+  legend("topright",
+         legend = as.character(levels(categories)),
+         col = 1:length(levels(categories)),
+         pch = 16)
+  write.csv2(quantile(response),
+             file = file.path(directory, paste("Cuantiles", column, centr.par, direction,".csv", sep = "")))
   dev.off()
 }
 
@@ -293,13 +366,19 @@ mahOutlier <- function(X){
 #'   Calcium entry through VOCCs when you are concern with asses SOCE
 #' @author Enrique Perez_Riesgo
 #' @param grupos Allows stablishing a number of groups deshired
-#' @param
+#' @param time.lapse.max If you want to fix an interval where get the max of the response you will set
+#'                       this param where the param-value is the upper bound of the interval, by considering
+#'                       that the lower bound is set as zero by program, but not by .csv build by researcher.
 #' @return plots
 #' @export analCI
 
 #Analisis de imagen
 
-analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5, data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms", Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.95, factor.error = 1.645, OscInd = "OI") {
+analCI <- function(grupos = NULL, time.lapse.max = NULL, agrupacion = "silueta",
+                   modo = "Kmedioids", outlier = TRUE,directory = NULL, skip = 5,
+                   data.scale = TRUE, legend.ROIs = TRUE, interval = NULL, Units = "ms",
+                   Smooth. = TRUE, y.int =c(0, 1.5), min.threshold = 0, slope.conf = 0.95,
+                   factor.error = 1.645, OscInd = "OI") {
   #directories
   if(is.null(directory)){
     directory <- getwd()
@@ -500,9 +579,22 @@ analCI <- function(grupos = NULL, agrupacion = "silueta", modo = "Kmedioids", ou
       pendientesL[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[1, ]
       pendientesU[i] <- apply(datos.int[,-1], 2, function(X){confint(lm(X ~ Y), parm = "Y", level = slope.conf)})[2, ]
       pendientes[i] <- sign(pendientesL[i]) + sign(pendientesU[i])
-      maximos1[i] <- apply(datos.int[1: sum(Y<=1), -1], 2, max)
+      # Por si acaso no quiero el máximo predicho por modelo6
+      if(!is.null(time.lapse.max)){
+        maximos1[i] <- apply(datos.int[1: sum(Y<=time.lapse.max), -1], 2, max)
+      }else{
+        maximos1[i] <- apply(datos.int[, -1], 2, max)
+      }
+      # maximo predicho por modelo6
       maximos1[i] <- modelo6
-      alturas1[i] <- apply(datos.int[1: sum(Y<=1),-1], 2, max)
+
+      # En caso de que se quiera que el máximo esté dentro de un intervalo timme.lapse.max desde que empieza el estimulo
+      if(!is.null(time.lapse.max)){
+        alturas1[i] <- apply(datos.int[1: sum(Y<=time.lapse.max),-1], 2, max)
+      }else{
+        alturas1[i] <- apply(datos.int[,-1], 2, max)
+      }
+
       intercepto[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[1]})
       pendientecoef[i] <- apply(datos.int[,-1], 2, function(X){coef(lm(X ~ Y))[2]})
       areas1[i] <- apply(datos.int[,-1], 2, function(x){trapz(x = Y, y = x)})/max(Y)
